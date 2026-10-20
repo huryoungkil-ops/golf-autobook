@@ -279,6 +279,10 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:16px 0
 details summary{cursor:pointer;color:var(--mute);font-size:14px;margin-top:12px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .chips span{padding:6px 10px;border-radius:10px;background:rgba(47,224,138,.1);border:1px solid rgba(47,224,138,.3);font-size:14px;font-variant-numeric:tabular-nums}
+.chips span.shut{background:rgba(255,255,255,.04);border-color:var(--line);color:var(--mute)}
+.chips small{font-size:11px;opacity:.8}
+label.chk{display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;margin-top:14px;cursor:pointer}
+label.chk input{width:18px;height:18px;accent-color:var(--green);margin:0}
 .btn-sm{padding:9px 14px;font-size:14px}
 form.inline{display:inline}
 .days{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
@@ -315,6 +319,10 @@ function timeOptions(selected) {
   return o;
 }
 
+function bayOptions(bays, selected, none = '— 선택 안 함 —') {
+  return `<option value="">${none}</option>` + bays.map((b) => `<option value="${esc(b)}"${b === selected ? ' selected' : ''}>${esc(b)}</option>`).join('');
+}
+
 function maskId(id) {
   const s = String(id || '');
   return s.length <= 3 ? s[0] + '**' : s.slice(0, 3) + '*'.repeat(Math.max(2, s.length - 3));
@@ -322,6 +330,8 @@ function maskId(id) {
 
 function appPage({ user, shops, requests, flash, flashErr, kakaoReady, slotsView, today, dateChoices, dayLabel }) {
   const pendingDates = new Set(requests.filter((r) => r.status === '대기').map((r) => r.target_date));
+  const bays = user.bays_json ? JSON.parse(user.bays_json) : [];
+  const prefBays = user.pref_bays_json ? JSON.parse(user.pref_bays_json) : [];
   const ivSet = !!(user.iv_id && user.iv_pw_enc);
   const shopOpts = shops.map((s) => `<option value="${esc(s.id)}"${s.id === user.default_shop ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
   const statusBadge = (s) => ({ 대기: 'b-wait', 성공: 'b-ok', 실패: 'b-fail', 취소: 'b-cancel' }[s] || 'b-cancel');
@@ -329,8 +339,9 @@ function appPage({ user, shops, requests, flash, flashErr, kakaoReady, slotsView
   const done = requests.filter((r) => r.status !== '대기').slice(0, 15);
   const reqRow = (r) => {
     const times = JSON.parse(r.times_json);
-    return `<div class="req"><div><div class="d">${dayLabel(r.target_date)} · ${esc(r.shop_name || r.shop_id)}<span class="badge ${statusBadge(r.status)}">${esc(r.status)}${r.status === '성공' ? ' ' + esc(r.booked_time) : ''}</span></div>
-<div class="t">희망 ${times.map((t, i) => `${i + 1}순위 <b>${esc(t)}</b>`).join(' · ')}${r.result_msg ? `<br>최근 결과: ${esc(r.result_msg)}` : ''}${r.status === '대기' ? `<br>다음 시도: 오늘 밤 00:00` : ''}</div></div>
+    const rb = r.bays_json ? JSON.parse(r.bays_json) : [];
+    return `<div class="req"><div><div class="d">${dayLabel(r.target_date)} · ${esc(r.shop_name || r.shop_id)}<span class="badge ${statusBadge(r.status)}">${esc(r.status)}${r.status === '성공' ? ' ' + esc(r.booked_time) + (r.booked_bay ? ' ' + esc(r.booked_bay) : '') : ''}</span></div>
+<div class="t">희망 ${times.map((t, i) => `${i + 1}순위 <b>${esc(t)}</b>`).join(' · ')}<br>타석 ${rb.length ? rb.map((x) => `<b>${esc(x)}</b>`).join(' → ') + (r.any_bay === 0 ? ' (이 타석만)' : ' (안 되면 다른 타석)') : '아무 타석'}${r.result_msg ? `<br>최근 결과: ${esc(r.result_msg)}` : ''}${r.status === '대기' ? `<br>다음 시도: 오늘 밤 00:00` : ''}</div></div>
 <div>${r.status === '대기' ? `<form class="inline" method="post" action="/app/req/${r.id}/try" data-busy="시도 중…" data-confirm="지금 바로 예약을 시도할까요? 빈자리가 있으면 실제로 예약됩니다."><button class="btn btn-ghost btn-sm">지금 시도</button></form>
 <form class="inline" method="post" action="/app/req/${r.id}/cancel" data-confirm="이 예약 요청을 지울까요? (임팩트비전에 이미 잡힌 예약은 취소되지 않습니다)"><button class="btn btn-red btn-sm">취소</button></form>` : ''}</div></div>`;
   };
@@ -354,6 +365,7 @@ ${ivSet ? '</details>' : ''}</div>
 <div class="card"><h2>📍 단골 매장</h2>
 ${!ivSet ? '<p class="desc">임팩트비전 계정을 먼저 저장하면 가입한 매장 목록을 불러옵니다.</p>'
     : shops.length ? `<p class="desc">한 번 고르면 바꿀 때까지 계속 이 매장으로 예약합니다.${user.shops_at ? ` (목록 갱신 ${esc(user.shops_at.slice(5, 16))})` : ''}</p>
+${bays.length ? `<p class="desc">타석: ${bays.map((x) => `<b>${esc(x)}</b>`).join(' · ')}</p>` : ''}
 <form method="post" action="/app/shop"><select name="shop">${user.default_shop ? '' : '<option value="">매장을 고르세요</option>'}${shopOpts}</select>
 <div class="actions"><button class="btn btn-main btn-sm">이 매장으로 저장</button></form>
 <form class="inline" method="post" action="/app/shops/refresh" data-busy="불러오는 중…"><button class="btn btn-ghost btn-sm">목록 새로 불러오기</button></form></div>`
@@ -369,6 +381,11 @@ ${user.default_shop ? `<form method="post" action="/app/req">
 <div class="row3"><div><label>1순위 시간</label><select name="t1" required>${timeOptions('19:00')}</select></div>
 <div><label>2순위</label><select name="t2">${timeOptions('')}</select></div>
 <div><label>3순위</label><select name="t3">${timeOptions('')}</select></div></div>
+${bays.length ? `<div class="row3"><div><label>타석 1순위</label><select name="b1">${bayOptions(bays, prefBays[0], '아무 타석')}</select></div>
+<div><label>타석 2순위</label><select name="b2">${bayOptions(bays, prefBays[1])}</select></div>
+<div><label>타석 3순위</label><select name="b3">${bayOptions(bays, prefBays[2])}</select></div></div>
+<label class="chk"><input type="checkbox" name="any_bay" value="1"${user.any_bay === 0 ? '' : ' checked'}> 고른 타석이 다 차 있으면 <b>다른 타석이라도</b> 잡기</label>
+<p class="desc" style="margin-top:6px">시간이 먼저입니다: 1순위 시간의 원하는 타석 → 그 시간의 다른 타석 → 2순위 시간 … 순서로 시도해요.</p>` : ''}
 <div class="actions"><button class="btn btn-main">예약 걸어 두기</button></div></form>` : '<p class="desc">단골 매장을 먼저 저장해 주세요.</p>'}
 </div>
 
@@ -381,7 +398,7 @@ ${user.default_shop ? `<div class="card"><h2>🔎 빈 시간 미리 보기</h2>
 <p class="desc">지금 임팩트비전에 보이는 빈 시간을 확인합니다 (예약은 하지 않아요).</p>
 <form method="post" action="/app/check" data-busy="확인 중…"><div class="row"><div><select name="date">${[{ date: today, dow: '오늘', md: '' }, ...dateChoices].map((d) => `<option value="${d.date}"${slotsView && slotsView.date === d.date ? ' selected' : ''}>${esc(d.md ? `${d.md} (${d.dow})` : `오늘 ${today.slice(5).replace('-', '/')}`)}</option>`).join('')}</select></div>
 <div><button class="btn btn-ghost" style="width:100%">빈 시간 보기</button></div></div></form>
-${slotsView ? (slotsView.error ? `<p class="desc bad" style="margin-top:12px">${esc(slotsView.error)}</p>` : slotsView.times.length ? `<div class="chips">${slotsView.times.map((t) => `<span>${esc(t)}</span>`).join('')}</div>` : `<p class="desc" style="margin-top:12px">${esc(slotsView.date)} 빈 시간이 보이지 않습니다 (아직 안 열렸거나 모두 찼어요).</p>`) : ''}
+${slotsView ? (slotsView.error ? `<p class="desc bad" style="margin-top:12px">${esc(slotsView.error)}</p>` : slotsView.times.length ? `<div class="chips">${slotsView.times.map((s) => `<span class="${s.open ? 'open' : 'shut'}">${esc(s.t)} <small>${esc(s.state)}</small></span>`).join('')}</div>${slotsView.times.every((s) => !s.open) ? '<p class="desc" style="margin-top:10px">«잠금»은 아직 예약이 열리기 전이라는 뜻이에요. 자정에 열리면 자동으로 시도합니다.</p>' : ''}` : `<p class="desc" style="margin-top:12px">${esc(slotsView.date)} 빈 시간이 보이지 않습니다 (아직 안 열렸거나 모두 찼어요).</p>`) : ''}
 </div>` : ''}
 
 <div class="card"><h2>🔔 알림 받을 곳</h2>

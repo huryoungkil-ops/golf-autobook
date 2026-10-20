@@ -55,19 +55,53 @@ function parseShops(html) {
   return shops;
 }
 
-// 시간표: 화면 어딘가에 박힌 reserve_time.php?... 주소들을 모은다
+// 시간표 (2026-10-20 실제 화면으로 확인): 1시간마다 <div class="reserve-box" source-file="reserve_time.php?method=confirm&sday=&ss=&se=&sid=&schidx=">
+// 안쪽 <div class="circle-reserve" title="LOCK|9807|1">잠금</div> — 아직 안 열린 시간은 LOCK/«잠금».
+// 열린 뒤의 상태 이름은 아직 못 봤다 → LOCK 이 아니면 시도해 보고, 확인 창·예약 응답으로 판정한다.
 function parseSlots(html) {
   const seen = new Set();
   const slots = [];
-  for (const m of decodeEnt(html).matchAll(/reserve_time\.php\?([^"'\s<>)]+)/g)) {
+  const text = decodeEnt(html);
+  const links = [...text.matchAll(/reserve_time\.php\?([^"'\s<>)]+)/g)];
+  links.forEach((m, i) => {
+    // 이 시간 칸 = 이 주소부터 다음 주소 전까지 (상태 동그라미가 그 안에 있다)
+    const part = text.slice(m.index, i + 1 < links.length ? links[i + 1].index : undefined);
     const q = new URLSearchParams(m[1]);
-    if (q.get('method') && q.get('method') !== 'confirm') continue;
-    const key = m[1];
-    if (seen.has(key)) continue;
-    seen.add(key);
-    slots.push({ query: m[1], sday: q.get('sday') || '', ss: hhmm(q.get('ss')), se: hhmm(q.get('se')), sid: q.get('sid') || '', schidx: q.get('schidx') || '' });
-  }
+    if (q.get('method') && q.get('method') !== 'confirm') return;
+    if (seen.has(m[1])) return;
+    seen.add(m[1]);
+    const circle = part.match(/<div\b([^>]*\bcircle-reserve\b[^>]*)>([\s\S]*?)<\/div>/i);
+    const code = circle ? String(attrs(circle[1]).title || '').split('|')[0] : '';
+    const label = circle ? stripTags(circle[2]) : '';
+    const locked = /^LOCK$/i.test(code) || /잠금/.test(label);
+    const closed = /마감|완료|불가|예약됨|FULL|CLOSE/i.test(`${code} ${label}`);
+    slots.push({ query: m[1], sday: q.get('sday') || '', ss: hhmm(q.get('ss')), se: hhmm(q.get('se')), sid: q.get('sid') || '', schidx: q.get('schidx') || '', code, label, locked, closed });
+  });
   return slots;
+}
+
+// 예약 확인 창: 타석(client_info)·이용권(rsv_pay_idx) 선택칸
+function parseConfirm(html) {
+  const sel = (name) => {
+    const m = html.match(new RegExp(`<select[^>]*name\\s*=\\s*["']?${name}["']?[^>]*>([\\s\\S]*?)</select>`, 'i'));
+    if (!m) return null;
+    return [...m[1].matchAll(/<option([^>]*)>([\s\S]*?)<\/option>/gi)].map((o) => ({ value: attrs(o[1]).value ?? '', name: stripTags(o[2].replace(/<br\s*\/?>/gi, ' ')) }));
+  };
+  const bays = (sel('client_info') || []).filter((o) => o.value);
+  const passes = (sel('rsv_pay_idx') || []).filter((o) => o.value && o.value !== '0');
+  return { bays, passes, hasBaySelect: /name\s*=\s*["']?client_info/i.test(html), hasPassSelect: /name\s*=\s*["']?rsv_pay_idx/i.test(html) };
+}
+
+// 타석 고르기: 선호 순서대로 비어 있는 첫 타석, 없으면 (anyBay 일 때) 아무 타석
+// 선호는 타석 이름 앞부분(«5번»)으로 맞춘다 — 값(3094|4)은 매장 사정으로 바뀔 수 있어서
+const bayKey = (name) => (String(name).match(/^\s*(\d+)\s*번/) || [])[1] || String(name).trim();
+function pickBay(bays, prefer = [], anyBay = true) {
+  for (const p of prefer) {
+    const hit = bays.find((b) => bayKey(b.name) === bayKey(p));
+    if (hit) return hit;
+  }
+  if (!prefer.length || anyBay) return bays[0] || null;
+  return null;
 }
 
 // 폼 하나를 jQuery serialize() 처럼 모은다. 약관 동의(agree) 체크박스는 체크한 것으로 친다.
@@ -176,37 +210,83 @@ class ImpactSession {
     return parseSlots(await this.reservePage(shopId, day));
   }
 
-  // 시간 순위대로 예약을 시도한다.
-  // 반환 state: booked(성공) · notopen(그날 시간표가 아직 없음) · full(원하는 시간이 모두 안 됨)
-  async book(shopId, day, times, { onLog = () => {} } = {}) {
-    const slots = (await this.slots(shopId, day)).filter((s) => !s.sday || s.sday === day);
-    if (!slots.length) return { state: 'notopen', msg: `${day} 예약 가능한 시간이 화면에 없음` };
+  async confirm(slot) {
+    const c = await this.req(`/m_v3/source-file/reserve_time.php?${slot.query}`, { xhr: true });
+    this.snap(`confirm-${slot.sday}-${slot.ss.replace(':', '')}`, c.text);
+    return c.text;
+  }
+
+  // 매장의 타석 목록 (아무 날 아무 시간의 확인 창에서 읽는다 — 조회만, 예약 안 함)
+  async bays(shopId, day) {
+    const slots = await this.slots(shopId, day);
+    for (const s of slots.slice(0, 3)) {
+      const { bays } = parseConfirm(await this.confirm(s));
+      if (bays.length) return bays.map((b) => b.name);
+    }
+    return [];
+  }
+
+  // 시간 순위대로 예약을 시도한다. 한 시간 안에서는 선호 타석 순서대로.
+  // 반환 state: booked(성공) · notopen(시간표가 아직 잠금/없음) · full(원하는 시간·타석이 모두 안 됨)
+  async book(shopId, day, times, { bays: preferBays = [], anyBay = true, onLog = () => {} } = {}) {
+    const all = (await this.slots(shopId, day)).filter((s) => !s.sday || s.sday === day);
+    if (!all.length) return { state: 'notopen', msg: `${day} 시간표가 화면에 없음` };
+    const wanted = times.map(hhmm).filter(Boolean);
+    const wantedSlots = all.filter((s) => wanted.includes(s.ss));
+    if (wantedSlots.length && wantedSlots.every((s) => s.locked)) return { state: 'notopen', msg: `${day} 아직 잠금 (예약 열리기 전)` };
+    if (!wantedSlots.length && all.every((s) => s.locked)) return { state: 'notopen', msg: `${day} 아직 잠금 (예약 열리기 전)` };
     const reasons = [];
-    for (const want of times.map(hhmm).filter(Boolean)) {
-      const cands = slots.filter((s) => s.ss === want);
-      if (!cands.length) { reasons.push(`${want} 빈자리 없음`); continue; }
-      for (const s of cands) {
-        const c = await this.req(`/m_v3/source-file/reserve_time.php?${s.query}`, { xhr: true });
-        this.snap(`confirm-${day}-${want.replace(':', '')}`, c.text);
-        const fields = parseForm(c.text, 'reserve-confirm');
-        if (!fields) { reasons.push(`${want} 확인 창을 못 읽음`); continue; }
+    for (const want of wanted) {
+      const s = all.find((x) => x.ss === want);
+      if (!s) { reasons.push(`${want} 시간표에 없음`); continue; }
+      if (s.locked) { reasons.push(`${want} 잠금`); continue; }
+      if (s.closed) { reasons.push(`${want} ${s.label || '마감'}`); continue; }
+      const html = await this.confirm(s);
+      const fields = parseForm(html, 'reserve-confirm');
+      if (!fields) { reasons.push(`${want} 확인 창을 못 읽음`); continue; }
+      const cf = parseConfirm(html);
+      // 이용권: «이용권 선택(0)» 이 아닌 첫 이용권
+      if (cf.hasPassSelect) {
+        if (!cf.passes.length) { reasons.push(`${want} 쓸 수 있는 이용권이 없음`); continue; }
+        setField(fields, 'rsv_pay_idx', cf.passes[0].value);
+      }
+      // 타석: 선호 → (허용하면) 나머지
+      let order = [null];
+      if (cf.hasBaySelect) {
+        if (!cf.bays.length) { reasons.push(`${want} 빈 타석 없음`); continue; }
+        const pref = preferBays.map((p) => cf.bays.find((b) => bayKey(b.name) === bayKey(p))).filter(Boolean);
+        const rest = cf.bays.filter((b) => !pref.includes(b));
+        order = preferBays.length && !anyBay ? pref : [...pref, ...rest];
+        if (!order.length) { reasons.push(`${want} 원하는 타석(${preferBays.join(', ')})이 비어 있지 않음`); continue; }
+      }
+      for (const bay of order) {
+        if (bay) setField(fields, 'client_info', bay.value);
         const body = new URLSearchParams(fields).toString();
+        const bayName = bay ? bay.name : '';
         if (DRY_RUN) {
-          onLog(`[시험] ${want} 예약 직전에서 멈춤: ${body}`);
-          return { state: 'booked', time: want, dry: true, msg: '시험 모드 — 실제 예약 안 함' };
+          onLog(`[시험] ${want} ${bayName} 예약 직전에서 멈춤: ${body}`);
+          return { state: 'booked', time: want, end: s.se, bay: bayName, dry: true, msg: '시험 모드 — 실제 예약 안 함' };
         }
         const r = await this.req('/m_v3/source-file/reserve_exe.php?mod=add', { method: 'POST', body, xhr: true });
         this.snap(`exe-${day}-${want.replace(':', '')}`, r.text);
         let j;
         try { j = JSON.parse(r.text.trim()); } catch { j = null; }
-        if (j && j.result !== 'F') return { state: 'booked', time: want, end: s.se, msg: j.msg || '접수 완료' };
+        if (j && j.result !== 'F') return { state: 'booked', time: want, end: s.se, bay: bayName, msg: j.msg || '접수 완료' };
         const why = j ? (j.msg || '실패') : `알 수 없는 응답: ${stripTags(r.text).slice(0, 120)}`;
-        reasons.push(`${want} ${why}`);
-        onLog(`${want} 실패: ${why}`);
+        reasons.push(`${want} ${bayName} ${why}`.replace(/\s+/g, ' '));
+        onLog(`${want} ${bayName} 실패: ${why}`);
+        // 타석과 상관없는 거절(이용권·횟수 제한 등)이면 다른 타석을 더 시도하지 않는다
+        if (!/타석|자리|이미|중복|예약된/.test(why)) break;
       }
     }
     return { state: 'full', msg: reasons.join(' · ') };
   }
 }
 
-module.exports = { ImpactSession, parseShops, parseSlots, parseForm, parseLoginResult, hhmm };
+function setField(fields, name, value) {
+  const i = fields.findIndex(([k]) => k === name);
+  if (i >= 0) fields[i] = [name, value];
+  else fields.push([name, value]);
+}
+
+module.exports = { ImpactSession, parseShops, parseSlots, parseForm, parseConfirm, pickBay, bayKey, parseLoginResult, hhmm };

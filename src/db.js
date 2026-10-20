@@ -40,6 +40,18 @@ CREATE TABLE IF NOT EXISTS logs (
 );
 `);
 
+// 나중에 더한 칸 (2026-10-21 타석)
+for (const [t, col] of [
+  ['users', 'bays_json TEXT'],        // 단골 매장의 타석 이름들 ["1번","2번",...,"5번 우타"]
+  ['users', 'pref_bays_json TEXT'],   // 마지막으로 고른 선호 타석 (다음 예약의 기본값)
+  ['users', 'any_bay INTEGER DEFAULT 1'],
+  ['requests', 'bays_json TEXT'],     // 선호 타석 순서
+  ['requests', 'any_bay INTEGER DEFAULT 1'], // 선호 타석이 안 되면 다른 타석도 OK
+  ['requests', 'booked_bay TEXT'],
+]) {
+  try { db.exec(`ALTER TABLE ${t} ADD COLUMN ${col}`); } catch { /* 이미 있음 */ }
+}
+
 const now = () => new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 19);
 const one = (sql, ...a) => db.prepare(sql).get(...a);
 const all = (sql, ...a) => db.prepare(sql).all(...a);

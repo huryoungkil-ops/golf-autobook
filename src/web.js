@@ -79,7 +79,22 @@ async function refreshShops(user, session) {
     const cur = shops.find((x) => x.id === user.default_shop);
     if (cur) run('UPDATE users SET default_shop_name=? WHERE id=?', cur.name, user.id);
   }
+  const fresh = one('SELECT * FROM users WHERE id=?', user.id);
+  if (fresh.default_shop) await refreshBays(fresh, s).catch(() => {});
   return { ok: true, shops };
+}
+
+// 단골 매장의 타석 목록 (예약 확인 창을 열어 보기만 한다)
+async function refreshBays(user, session) {
+  let s = session;
+  if (!s) {
+    const r = await loginUser(user);
+    if (!r.ok) return [];
+    s = r.session;
+  }
+  const bays = await s.bays(user.default_shop, kstToday(1));
+  run('UPDATE users SET bays_json=? WHERE id=?', JSON.stringify(bays), user.id);
+  return bays;
 }
 
 // 로그인 실패 잠금 (5번 틀리면 15분)
@@ -203,8 +218,9 @@ async function handle(req, res) {
     const shops = user.shops_json ? JSON.parse(user.shops_json) : [];
     const pick = shops.find((x) => x.id === b.get('shop'));
     if (!pick) return back(res, '매장을 골라 주세요.', true);
-    run('UPDATE users SET default_shop=?, default_shop_name=? WHERE id=?', pick.id, pick.name, user.id);
-    return back(res, `단골 매장을 «${pick.name}»(으)로 저장했습니다.`);
+    run('UPDATE users SET default_shop=?, default_shop_name=?, pref_bays_json=NULL WHERE id=?', pick.id, pick.name, user.id);
+    const bays = await refreshBays({ ...user, default_shop: pick.id }).catch(() => []);
+    return back(res, `단골 매장을 «${pick.name}»(으)로 저장했습니다.${bays.length ? ` 타석 ${bays.length}개를 불러왔어요.` : ''}`);
   }
 
   if (p === '/app/req') {
@@ -218,14 +234,21 @@ async function handle(req, res) {
     const times = [...new Set([b.get('t1'), b.get('t2'), b.get('t3')].map(hhmm).filter((t) => /^(09|1\d|20|21):00$/.test(t)))];
     if (!times.length) return back(res, '1순위 시간을 골라 주세요.', true);
     if (one("SELECT COUNT(*) n FROM requests WHERE user_id=? AND status='대기'", user.id).n + dates.length > 20) return back(res, '대기 중인 예약은 한 사람당 20건까지입니다.', true);
+    // 선호 타석 (단골 매장의 타석 이름 중에서), 비어 있지 않으면 다른 타석도 OK?
+    const known = user.bays_json ? JSON.parse(user.bays_json) : [];
+    const bays = [...new Set([b.get('b1'), b.get('b2'), b.get('b3')].map((x) => String(x || '').trim()).filter((x) => x && known.includes(x)))];
+    const anyBay = !bays.length || b.get('any_bay') === '1' ? 1 : 0;
     let added = 0;
     for (const d of dates) {
       if (one("SELECT id FROM requests WHERE user_id=? AND target_date=? AND status='대기'", user.id, d)) continue;
-      run('INSERT INTO requests(user_id,target_date,shop_id,shop_name,times_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)', user.id, d, shop.id, shop.name, JSON.stringify(times), now(), now());
+      run('INSERT INTO requests(user_id,target_date,shop_id,shop_name,times_json,bays_json,any_bay,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)', user.id, d, shop.id, shop.name, JSON.stringify(times), JSON.stringify(bays), anyBay, now(), now());
       added++;
     }
+    // 다음 예약 때 그대로 나오게 기억
+    run('UPDATE users SET pref_bays_json=?, any_bay=? WHERE id=?', JSON.stringify(bays), anyBay, user.id);
     if (shop.id !== user.default_shop) run('UPDATE users SET default_shop=?, default_shop_name=? WHERE id=?', shop.id, shop.name, user.id);
-    return back(res, `${added}건을 걸어 두었습니다 — ${dates.map(dayLabel).join(', ')} · ${times.join(' → ')}`);
+    const bayText = bays.length ? ` · 타석 ${bays.join(' → ')}${anyBay ? ' (안 되면 다른 타석)' : ' (이 타석만)'}` : ' · 타석 아무 데나';
+    return back(res, `${added}건을 걸어 두었습니다 — ${dates.map(dayLabel).join(', ')} · ${times.join(' → ')}${bayText}`);
   }
 
   let m = p.match(/^\/app\/req\/(\d+)\/(cancel|try)$/);
@@ -239,8 +262,8 @@ async function handle(req, res) {
     const lr = await loginUser(user).catch((e) => ({ ok: false, msg: e.message }));
     if (!lr.ok) return back(res, `임팩트비전 로그인 실패: ${lr.msg}`, true);
     const res2 = await attempt(lr.session, r, { quiet: true });
-    if (res2.state === 'booked') return back(res, `⛳ 예약 성공! ${dayLabel(r.target_date)} ${res2.time}${res2.dry ? ' (시험 모드 — 실제 예약 안 함)' : ''}`);
-    return back(res, res2.state === 'notopen' ? `아직 ${dayLabel(r.target_date)} 시간표가 열리지 않았습니다. 자정에 다시 시도합니다.` : `지금은 못 잡았습니다: ${res2.msg}. 자정에 다시 시도합니다.`, true);
+    if (res2.state === 'booked') return back(res, `⛳ 예약 성공! ${dayLabel(r.target_date)} ${res2.time}${res2.bay ? ' ' + res2.bay + ' 타석' : ''}${res2.dry ? ' (시험 모드 — 실제 예약 안 함)' : ''}`);
+    return back(res, res2.state === 'notopen' ? `아직 ${dayLabel(r.target_date)} 예약이 열리지 않았습니다(잠금). 자정에 다시 시도합니다.` : `지금은 못 잡았습니다: ${res2.msg}. 자정에 다시 시도합니다.`, true);
   }
 
   if (p === '/app/check') {
@@ -252,7 +275,11 @@ async function handle(req, res) {
       const lr = await loginUser(user);
       if (!lr.ok) throw new Error(`임팩트비전 로그인 실패: ${lr.msg}`);
       const slots = await lr.session.slots(user.default_shop, date);
-      view = { date, times: [...new Set(slots.filter((s) => !s.sday || s.sday === date).map((s) => s.ss + (s.se ? '~' + s.se : '')))].sort() };
+      view = {
+        date,
+        times: slots.filter((s) => !s.sday || s.sday === date).sort((a, c) => a.ss.localeCompare(c.ss))
+          .map((s) => ({ t: s.ss, state: s.locked ? '잠금' : s.closed ? (s.label || '마감') : (s.label || '열림'), open: !s.locked && !s.closed })),
+      };
     } catch (e) { view = { date, times: [], error: e.message }; }
     slotsCache.set(user.id, view);
     return redirect(res, '/app#check');
