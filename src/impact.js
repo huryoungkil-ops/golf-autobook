@@ -57,7 +57,7 @@ function parseShops(html) {
 
 // 시간표 (2026-10-20 실제 화면으로 확인): 1시간마다 <div class="reserve-box" source-file="reserve_time.php?method=confirm&sday=&ss=&se=&sid=&schidx=">
 // 안쪽 <div class="circle-reserve" title="LOCK|9807|1">잠금</div> — 아직 안 열린 시간은 LOCK/«잠금».
-// 열린 뒤의 상태 이름은 아직 못 봤다 → LOCK 이 아니면 시도해 보고, 확인 창·예약 응답으로 판정한다.
+// 열린 시간은 title="FREE|idx|1" (2026-10-21 00:00 실측: 그날 시간표가 그날 자정에 LOCK→FREE). 성공 응답 {"result":"T","msg":"예약 접수가 완료되었습니다."}
 function parseSlots(html) {
   const seen = new Set();
   const slots = [];
@@ -304,7 +304,7 @@ class ImpactSession {
 // 내 예약 내역 (reserve_my.php?method=list — 최근 10건). 2026-10-21 실제 화면으로 확인:
 // <div class="my-reserve-box-detail"> 매장 · <div class="reserve-time">21:00</div> · <div class="reserve-day">(일) 2026-10-18 <span class="lockidx_num_ico_my">2번 타석</span>
 // 상태 동그라미 <div class="circle-reserve-end" data-cancel-idx="6805391">완료</div> — 지난 예약은 end/«완료»,
-// 앞으로의 예약은 사이트 스크립트상 circle-reserve-cancel (아직 실물 못 봄)
+// 앞으로의 예약은 <div class="circle-reserve-cancel" data-cancel-idx="…">취소</div> (2026-10-21 실측)
 function parseMyList(html) {
   const out = [];
   const parts = html.split(/(?=<div[^>]*class\s*=\s*["']my-reserve-box-detail)/i).slice(1);
