@@ -11,7 +11,7 @@ id golf >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nolo
 mkdir -p "$APP/data" /var/backups/golf-autobook
 if [ ! -f "$APP/.env" ]; then
   cat > "$APP/.env" <<ENV
-PUBLIC_BASE=https://golf.180-70-116-114.sslip.io
+PUBLIC_BASE=https://impactvision.mooo.com
 # 임팩트비전 비밀번호 암호화 키 — 바꾸거나 잃어버리면 저장된 비밀번호를 못 푼다 (백업할 것)
 SECRET_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")
 # 운영자 디스코드 (가입·밤사이 결과·이상), 카카오(경매알리미와 같은 앱)
@@ -42,4 +42,4 @@ systemctl reload caddy
 cat > /etc/cron.d/golf-autobook-backup <<CRON
 50 3 * * * golf sqlite3 $APP/data/golf.db ".backup /var/backups/golf-autobook/golf-\$(date +\%F).db" && gzip -f /var/backups/golf-autobook/golf-\$(date +\%F).db && find /var/backups/golf-autobook -name '*.db.gz' -mtime +30 -delete
 CRON
-echo "설치 끝 — curl -s https://golf.180-70-116-114.sslip.io/healthz ; systemctl list-timers golf-midnight.timer"
+echo "설치 끝 — curl -s https://impactvision.mooo.com/healthz ; systemctl list-timers golf-midnight.timer"

@@ -5,7 +5,7 @@
 결과를 카카오톡(나와의 채팅)·디스코드로 알린다. 여러 사람이 함께 쓴다(지금 5명 이내, 최대 30명 설정).
 
 - 서버: 카페24 180.70.116.114, `/opt/golf-autobook`, 계정 `golf`
-- 주소: https://golf.180-70-116-114.sslip.io (임시. 도메인은 `deploy/Caddyfile` + `.env` PUBLIC_BASE)
+- 주소: https://impactvision.mooo.com (보조 golf.180-70-116-114.sslip.io. 바꿀 땐 `deploy/Caddyfile` + `.env` PUBLIC_BASE + 카카오 Redirect URI)
 - 외부 패키지 없음 (Node 22.13+, `node:sqlite`)
 
 | 경로 | 내용 |

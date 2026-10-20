@@ -1,7 +1,7 @@
 # 임팩트비전 자동예약 → golf-web(127.0.0.1:5720). deploy/setup.sh 가 /etc/caddy/sites/golf.caddy 로 복사한다.
-# 임시 주소: golf.180-70-116-114.sslip.io (이름이 곧 IP 라 따로 설정할 것이 없다)
+# 주소: impactvision.mooo.com (2026-10-21, A 레코드 180.70.116.114) · 보조 golf.180-70-116-114.sslip.io
 # 도메인을 붙이면 아래 목록에 쉼표로 더하고, .env 의 PUBLIC_BASE 도 바꾼 뒤 systemctl reload caddy && systemctl restart golf-web
-golf.180-70-116-114.sslip.io {
+impactvision.mooo.com, golf.180-70-116-114.sslip.io {
 	encode gzip
 	reverse_proxy 127.0.0.1:5720
 }
