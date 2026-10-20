@@ -10,13 +10,13 @@ const { loginUser, attempt, dayLabel, kstToday } = require('./booker');
 
 const COOKIE = 'gab';
 const SESSION_DAYS = 60;
-const DAYS_AHEAD = 14;
+const DAYS_SHOWN = 18;
 const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 
-// 고를 수 있는 날짜: 내일부터 2주, 월요일(휴무) 빼고
+// 고를 수 있는 날짜: 내일부터 월요일(휴무)을 뺀 18일. 날이 바뀌면 하루씩 밀린다
 function dateChoices() {
   const out = [];
-  for (let i = 1; i <= DAYS_AHEAD; i++) {
+  for (let i = 1; out.length < DAYS_SHOWN; i++) {
     const date = kstToday(i);
     const w = new Date(date + 'T00:00:00Z').getUTCDay();
     if (w === 1) continue;
@@ -213,7 +213,7 @@ async function handle(req, res) {
     if (!shop) return back(res, '매장을 골라 주세요.', true);
     const allowed = new Set(dateChoices().map((d) => d.date));
     const dates = [...new Set(b.getAll('date'))].filter((d) => allowed.has(d));
-    if (!dates.length) return back(res, '날짜를 하나 이상 골라 주세요 (내일부터 2주, 월요일 제외).', true);
+    if (!dates.length) return back(res, '날짜를 하나 이상 골라 주세요 (내일부터 18일, 월요일 제외).', true);
     // 1시간 단위, 09:00 ~ 21:00 만
     const times = [...new Set([b.get('t1'), b.get('t2'), b.get('t3')].map(hhmm).filter((t) => /^(09|1\d|20|21):00$/.test(t)))];
     if (!times.length) return back(res, '1순위 시간을 골라 주세요.', true);
