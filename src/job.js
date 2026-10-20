@@ -1,6 +1,6 @@
 // 자정 예약 작업. systemd 타이머가 23:58:30 에 띄운다 (deploy/golf-midnight.timer).
 //   23:58:30 대기 중인 예약을 모아 사람별로 임팩트비전에 미리 로그인
-//   00:00:00 정각 — 모두 동시에 예약 시도. 시간표가 아직 안 열렸으면 OPEN_WAIT_SEC 동안 2초마다 다시 본다
+//   00:01:00 — 모두 동시에 예약 시도 (START_DELAY_SEC, 정각 직후 혼잡 피함). 거절되면 FULL_RETRIES 번 더. 시간표가 아직 안 열렸으면 OPEN_WAIT_SEC 동안 2초마다 다시 본다
 //   끝나면 운영자 디스코드에 요약
 // 손으로 돌리기: node src/job.js --now   (기다리지 않고 바로, 오늘 날짜 기준)
 const { all, run, now, log } = require('./db');
@@ -11,6 +11,7 @@ const notify = require('./notify');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const nextDay = (d) => new Date(Date.parse(d + 'T00:00:00Z') + 86400e3).toISOString().slice(0, 10);
 const START_DELAY_SEC = Number(process.env.START_DELAY_SEC || 60);
+const FULL_RETRIES = Number(process.env.FULL_RETRIES || 2);
 const NOW_MODE = process.argv.includes('--now');
 
 async function main() {
@@ -57,10 +58,18 @@ async function main() {
       const canWait = req.target_date <= nextDay(openDay);
       const started = Date.now();
       let res;
+      let fullTries = 0; // 거절(«full»)돼도 FULL_RETRIES 번 더 다시 본다 — 순간 혼잡·일시 오류로 튕겼을 수 있어서
       for (;;) {
-        const lastTry = !canWait || Date.now() >= started + OPEN_WAIT_SEC * 1000;
-        res = await attempt(session, req, { final, lastTry });
-        if (res.state === 'booked' || res.state === 'full' || lastTry) break;
+        const timeUp = !canWait || Date.now() >= started + OPEN_WAIT_SEC * 1000;
+        const lastFull = fullTries >= FULL_RETRIES;
+        // 중간 시도의 실패는 알리지 않고, 마지막 시도 결과만 알린다 (성공은 언제든 바로 알림)
+        res = await attempt(session, req, { final, lastTry: timeUp, quietFail: !(timeUp || lastFull) });
+        if (res.state === 'booked' || timeUp) break;
+        if (res.state === 'full') {
+          if (lastFull) break;
+          fullTries++;
+          log(uid, req.id, `거절 — ${fullTries}번째 재시도 예정`);
+        }
         if (res.state === 'error') {
           // 세션이 끊겼을 수 있다 → 다시 로그인
           const user = all('SELECT * FROM users WHERE id=?', uid)[0];

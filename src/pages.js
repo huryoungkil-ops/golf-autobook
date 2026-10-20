@@ -130,7 +130,7 @@ const LANDING_JS = `
 function pad(n){return String(n).padStart(2,'0')}
 function kstNow(){return new Date(Date.now()+9*3600e3)}
 function tick(){
-  var n=kstNow();var left=86400-(n.getUTCHours()*3600+n.getUTCMinutes()*60+n.getUTCSeconds());
+  var n=kstNow();var left=((86460-(n.getUTCHours()*3600+n.getUTCMinutes()*60+n.getUTCSeconds()))%86400)||86400;
   var h=Math.floor(left/3600),m=Math.floor(left%3600/60),s=left%60;
   var el=document.getElementById('cd');if(el)el.innerHTML='<b>'+pad(h)+'</b><i>:</i><b>'+pad(m)+'</b><i>:</i><b>'+pad(s)+'</b>';
 }
@@ -150,7 +150,7 @@ function landing({ loggedIn }) {
 
 <header class="hero">
  <div>
-  <span class="pill"><span class="dot"></span>매일 밤 00:00 정각 자동 실행</span>
+  <span class="pill"><span class="dot"></span>매일 밤 00:01 자동 실행</span>
   <h1>잠든 사이,<br><span class="hl">황금 시간대</span>는<br>이미 내 것.</h1>
   <p class="lead">원하는 날짜와 시간을 미리 적어 두기만 하세요. 자정이 되는 순간 임팩트비전에 대신 로그인해서, 1·2·3순위 시간 중 비어 있는 자리를 잡아 드립니다. 알람도, 밤샘도 이제 필요 없어요.</p>
   <div class="cta"><a class="btn btn-main" href="${go}">⛳ ${goText}</a><a class="btn btn-ghost" href="#how">어떻게 동작하나요?</a></div>
@@ -158,11 +158,11 @@ function landing({ loggedIn }) {
  </div>
  <div class="phone-wrap" aria-hidden="true"><div class="glow"></div>
   <div class="phone"><div class="screen"><div class="notch"></div><div class="moon"></div><div class="zz">z z z</div>
-   <div class="lock-time">00:00</div><div class="lock-date">잠든 사이 도착한 알림</div>
+   <div class="lock-time">00:01</div><div class="lock-date">잠든 사이 도착한 알림</div>
    <div class="notis">
    <div class="noti n0"><div class="h"><b>🔐 자동예약</b><span>23:58</span></div>임팩트비전 로그인 완료 · 정각 대기 중</div>
-   <div class="noti n1"><div class="h"><b>💬 카카오톡</b><span>00:00</span></div><span class="ok">⛳ 예약 성공</span><br>목요일 19:00 · DMC 아트포레자이<br>1순위 시간으로 잡았어요</div>
-   <div class="noti n2"><div class="h"><b>🎮 디스코드</b><span>00:00</span></div>🌙 오늘 밤 자동예약 3건 모두 성공<br><span style="color:#ffffffaa">다들 푹 주무세요</span></div>
+   <div class="noti n1"><div class="h"><b>💬 카카오톡</b><span>00:01</span></div><span class="ok">⛳ 예약 성공</span><br>목요일 19:00 · DMC 아트포레자이<br>1순위 시간으로 잡았어요</div>
+   <div class="noti n2"><div class="h"><b>🎮 디스코드</b><span>00:01</span></div>🌙 오늘 밤 자동예약 3건 모두 성공<br><span style="color:#ffffffaa">다들 푹 주무세요</span></div>
    </div>
   </div></div>
  </div>
@@ -183,7 +183,7 @@ function landing({ loggedIn }) {
  <h2>한 번 적어 두면, 나머지는 알아서.</h2>
  <p class="sub">처음 한 번만 설정하면 됩니다. 계정과 단골 매장은 기억해 두니, 다음부터는 날짜와 시간만 고르세요.</p>
  <div class="grid">
-  <div class="feat"><div class="ic">🌙</div><h3>자정 정각 자동 예약</h3><p>23:58에 미리 로그인해 대기하다가 00:00:00에 바로 예약합니다. 사람 손보다 빠릅니다.</p></div>
+  <div class="feat"><div class="ic">🌙</div><h3>자정 자동 예약</h3><p>23:58에 미리 로그인해 대기하다가 00:01에 바로 예약합니다. 정각 직후의 혼잡은 피하고, 사람 손보다는 빠릅니다.</p></div>
   <div class="feat"><div class="ic">🥇</div><h3>1·2·3순위 시간</h3><p>19시가 이미 찼다면? 20시, 18시처럼 정해 둔 다음 순위 시간을 이어서 시도합니다.</p></div>
   <div class="feat"><div class="ic">📍</div><h3>단골 매장 기억</h3><p>가입한 매장 목록을 자동으로 불러와 드롭다운에 보여 줍니다. 한 번 고르면 바꿀 때까지 그대로예요.</p></div>
   <div class="feat"><div class="ic">🔔</div><h3>카카오톡·디스코드 알림</h3><p>성공하면 바로 알려 드리고, 못 잡았으면 그 이유까지 알려 드립니다. 아침에 확인만 하세요.</p></div>
@@ -202,8 +202,8 @@ function landing({ loggedIn }) {
  </div>
  <div class="timeline">
   <div class="tl"><div class="t">23:58</div><div class="d">예약을 걸어 둔 모든 분의 계정으로 미리 로그인 <span>— 접속 지연 없이 대기</span></div></div>
-  <div class="tl"><div class="t">00:00:00</div><div class="d">정각에 모두 동시에 예약 시도 <span>— 1순위가 찼으면 바로 2·3순위</span></div></div>
-  <div class="tl"><div class="t">00:00~03</div><div class="d">시간표가 늦게 열리면 몇 초마다 다시 확인 <span>— 3분 동안</span></div></div>
+  <div class="tl"><div class="t">00:01:00</div><div class="d">모두 동시에 예약 시도 <span>— 1순위가 찼으면 바로 2·3순위</span></div></div>
+  <div class="tl"><div class="t">00:01~04</div><div class="d">아직 잠겨 있으면 2초마다 다시 확인, 거절되면 두 번 더 재시도 <span>— 최대 3분</span></div></div>
   <div class="tl"><div class="t">완료</div><div class="d">카카오톡·디스코드로 결과 알림 <span>— 아침에 확인만 하세요</span></div></div>
  </div>
 </section>
@@ -327,7 +327,7 @@ form.inline{display:inline}
 
 const APP_JS = `
 function pad(n){return String(n).padStart(2,'0')}
-function tick(){var n=new Date(Date.now()+9*3600e3);var l=86400-(n.getUTCHours()*3600+n.getUTCMinutes()*60+n.getUTCSeconds());
+function tick(){var n=new Date(Date.now()+9*3600e3);var l=((86460-(n.getUTCHours()*3600+n.getUTCMinutes()*60+n.getUTCSeconds()))%86400)||86400;
 var el=document.getElementById('cd');if(el)el.textContent=pad(Math.floor(l/3600))+':'+pad(Math.floor(l%3600/60))+':'+pad(l%60)}
 tick();setInterval(tick,1000);
 function bindForms(root){
@@ -377,7 +377,7 @@ function appPage({ user, shops, requests, flash, flashErr, kakaoReady, slotsView
     const times = JSON.parse(r.times_json);
     const rb = r.bays_json ? JSON.parse(r.bays_json) : [];
     return `<div class="req"><div><div class="d">${dayLabel(r.target_date)} · ${esc(r.shop_name || r.shop_id)}<span class="badge ${statusBadge(r.status)}">${esc(r.status)}${r.status === '성공' ? ' ' + esc(r.booked_time) + (r.booked_bay ? ' ' + esc(r.booked_bay) : '') : ''}</span></div>
-<div class="t">희망 ${times.map((t, i) => `${i + 1}순위 <b>${esc(t)}</b>`).join(' · ')}<br>타석 ${rb.length ? rb.map((x) => `<b>${esc(x)}</b>`).join(' → ') + (r.any_bay === 0 ? ' (이 타석만)' : ' (안 되면 다른 타석)') : '아무 타석'}${r.result_msg ? `<br>최근 결과: ${esc(r.result_msg)}` : ''}${r.status === '대기' ? `<br>다음 시도: 오늘 밤 00:00` : ''}</div></div>
+<div class="t">희망 ${times.map((t, i) => `${i + 1}순위 <b>${esc(t)}</b>`).join(' · ')}<br>타석 ${rb.length ? rb.map((x) => `<b>${esc(x)}</b>`).join(' → ') + (r.any_bay === 0 ? ' (이 타석만)' : ' (안 되면 다른 타석)') : '아무 타석'}${r.result_msg ? `<br>최근 결과: ${esc(r.result_msg)}` : ''}${r.status === '대기' ? `<br>다음 시도: 오늘 밤 00:01` : ''}</div></div>
 <div>${r.status === '대기' ? `<form class="inline" method="post" action="/app/req/${r.id}/try" data-busy="시도 중…" data-confirm="지금 바로 예약을 시도할까요? 빈자리가 있으면 실제로 예약됩니다."><button class="btn btn-ghost btn-sm">지금 시도</button></form>
 <form class="inline" method="post" action="/app/req/${r.id}/cancel" data-confirm="이 예약 요청을 지울까요? (임팩트비전에 이미 잡힌 예약은 취소되지 않습니다)"><button class="btn btn-red btn-sm">취소</button></form>` : ''}</div></div>`;
   };
@@ -386,7 +386,7 @@ function appPage({ user, shops, requests, flash, flashErr, kakaoReady, slotsView
 <nav><a class="logo" href="/"><span class="ball"></span>${NAME}</a>
 <div class="who">${esc(user.login)} 님 <form class="inline" method="post" action="/logout"><button class="btn btn-ghost btn-sm">로그아웃</button></form></div></nav>
 ${flash ? `<div class="flash${flashErr ? ' err' : ''}">${esc(flash)}</div>` : ''}
-<div class="hero"><div><h1>다음 자동 예약까지</h1><p>대기 중인 예약 ${pending.length}건 · 매일 00:00 정각 실행</p></div><div class="cd" id="cd"></div></div>
+<div class="hero"><div><h1>다음 자동 예약까지</h1><p>대기 중인 예약 ${pending.length}건 · 매일 00:01 실행</p></div><div class="cd" id="cd"></div></div>
 
 ${ivSet ? `<div class="card" id="mine-card"><h2>📅 내 예약 현황 <button type="button" class="btn btn-ghost btn-sm" id="mine-reload" style="margin-left:auto">새로고침</button></h2>
 <p class="desc">임팩트비전에 실제로 잡혀 있는 예약입니다 (최근 10건).</p>

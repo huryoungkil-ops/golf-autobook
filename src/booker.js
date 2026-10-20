@@ -23,7 +23,8 @@ async function loginUser(user) {
 
 // final: 오늘(자정)이 그 날짜의 마지막 기회인가 · lastTry: 이번 밤의 마지막 시도인가
 // quiet: 알림 안 보냄 (사이트의 «지금 시도» 버튼 — 결과는 화면에 바로 보여준다)
-async function attempt(session, req, { final = false, lastTry = false, quiet = false, onLog } = {}) {
+// quietFail: 실패는 기록만 하고 알리지도 닫지도 않는다 (곧 다시 시도할 때)
+async function attempt(session, req, { final = false, lastTry = false, quiet = false, quietFail = false, onLog } = {}) {
   const times = JSON.parse(req.times_json);
   run('UPDATE requests SET attempts=attempts+1, updated_at=? WHERE id=?', now(), req.id);
   let res;
@@ -45,6 +46,8 @@ async function attempt(session, req, { final = false, lastTry = false, quiet = f
     const rank = times.indexOf(res.time) + 1;
     run("UPDATE requests SET status='성공', booked_time=?, booked_bay=?, result_msg=?, updated_at=? WHERE id=?", res.time, res.bay || null, res.msg || '', now(), req.id);
     await say(`⛳ 예약 성공${res.dry ? ' (시험 모드)' : ''}\n${where} ${res.time}${res.end ? '~' + res.end : ''}${res.bay ? ' · ' + res.bay + ' 타석' : ''} (${rank}순위)\n${res.msg || ''}`);
+  } else if (quietFail) {
+    run('UPDATE requests SET result_msg=?, updated_at=? WHERE id=?', res.msg, now(), req.id);
   } else if (final && (res.state === 'full' || lastTry)) {
     run("UPDATE requests SET status='실패', result_msg=?, updated_at=? WHERE id=?", res.msg, now(), req.id);
     await say(`😢 예약 실패\n${where} — ${times.join(', ')}\n${res.msg}`);
