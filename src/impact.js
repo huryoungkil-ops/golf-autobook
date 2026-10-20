@@ -270,9 +270,10 @@ class ImpactSession {
       }
       // 타석: 선호 → (허용하면) 나머지
       let order = [null];
+      let pref = [];
       if (cf.hasBaySelect) {
         if (!cf.bays.length) { reasons.push(`${want} 빈 타석 없음`); continue; }
-        const pref = preferBays.map((p) => cf.bays.find((b) => bayKey(b.name) === bayKey(p))).filter(Boolean);
+        pref = preferBays.map((p) => cf.bays.find((b) => bayKey(b.name) === bayKey(p))).filter(Boolean);
         const rest = cf.bays.filter((b) => !pref.includes(b));
         order = preferBays.length && !anyBay ? pref : [...pref, ...rest];
         if (!order.length) { reasons.push(`${want} 원하는 타석(${preferBays.join(', ')})이 비어 있지 않음`); continue; }
@@ -281,15 +282,18 @@ class ImpactSession {
         if (bay) setField(fields, 'client_info', bay.value);
         const body = new URLSearchParams(fields).toString();
         const bayName = bay ? bay.name : '';
+        // 선호 타석이 아닌 곳으로 잡았으면 알림에 이유를 붙인다
+        const bayNote = bay && preferBays.length && !pref.includes(bay)
+          ? `원하신 ${preferBays.join('·')} 타석이 비어 있지 않아 ${bayName}(으)로 잡았습니다 (그때 빈 타석: ${cf.bays.map((x) => x.name).join(', ')})` : '';
         if (DRY_RUN) {
           onLog(`[시험] ${want} ${bayName} 예약 직전에서 멈춤: ${body}`);
-          return { state: 'booked', time: want, end: s.se, bay: bayName, dry: true, msg: '시험 모드 — 실제 예약 안 함' };
+          return { state: 'booked', time: want, end: s.se, bay: bayName, bayNote, dry: true, msg: '시험 모드 — 실제 예약 안 함' };
         }
         const r = await this.req('/m_v3/source-file/reserve_exe.php?mod=add', { method: 'POST', body, xhr: true });
         this.snap(`exe-${day}-${want.replace(':', '')}`, r.text);
         let j;
         try { j = JSON.parse(r.text.trim()); } catch { j = null; }
-        if (j && j.result !== 'F') return { state: 'booked', time: want, end: s.se, bay: bayName, msg: j.msg || '접수 완료' };
+        if (j && j.result !== 'F') return { state: 'booked', time: want, end: s.se, bay: bayName, bayNote, msg: j.msg || '접수 완료' };
         const why = j ? (j.msg || '실패') : `알 수 없는 응답: ${stripTags(r.text).slice(0, 120)}`;
         reasons.push(`${want} ${bayName} ${why}`.replace(/\s+/g, ' '));
         onLog(`${want} ${bayName} 실패: ${why}`);

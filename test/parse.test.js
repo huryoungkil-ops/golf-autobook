@@ -80,6 +80,10 @@ test('예약 흐름: 잠긴 시간은 건너뛰고, 선호 타석·이용권을 
   assert.equal(r.bay, '5번 우타');
   assert.equal(sent[0].get('client_info'), '3094|4');
   assert.equal(sent[0].get('rsv_pay_idx'), '386694');
+  assert.equal(r.bayNote, '');
+  const r3 = await s.book('ivm031169', '2026-10-21', ['20:00'], { bays: ['4번'] });
+  assert.equal(r3.bay, '1번');
+  assert.match(r3.bayNote, /원하신 4번 타석이 비어 있지 않아 1번/);
   // 원하는 시간이 모두 잠금이면 «안 열림»
   const r2 = await s.book('ivm031169', '2026-10-21', ['19:00']);
   assert.equal(r2.state, 'notopen');

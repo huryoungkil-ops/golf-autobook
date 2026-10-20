@@ -44,8 +44,8 @@ async function attempt(session, req, { final = false, lastTry = false, quiet = f
   const say = (text) => (quiet ? null : notify.toUser(user, text));
   if (res.state === 'booked') {
     const rank = times.indexOf(res.time) + 1;
-    run("UPDATE requests SET status='성공', booked_time=?, booked_bay=?, result_msg=?, updated_at=? WHERE id=?", res.time, res.bay || null, res.msg || '', now(), req.id);
-    await say(`⛳ 예약 성공${res.dry ? ' (시험 모드)' : ''}\n${where} ${res.time}${res.end ? '~' + res.end : ''}${res.bay ? ' · ' + res.bay + ' 타석' : ''} (${rank}순위)\n${res.msg || ''}`);
+    run("UPDATE requests SET status='성공', booked_time=?, booked_bay=?, result_msg=?, updated_at=? WHERE id=?", res.time, res.bay || null, [res.msg, res.bayNote].filter(Boolean).join(' · '), now(), req.id);
+    await say(`⛳ 예약 성공${res.dry ? ' (시험 모드)' : ''}\n${where} ${res.time}${res.end ? '~' + res.end : ''}${res.bay ? ' · ' + res.bay + ' 타석' : ''} (${rank}순위)\n${res.msg || ''}${res.bayNote ? '\n' + res.bayNote : ''}`);
   } else if (quietFail) {
     run('UPDATE requests SET result_msg=?, updated_at=? WHERE id=?', res.msg, now(), req.id);
   } else if (final && (res.state === 'full' || lastTry)) {
