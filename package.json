@@ -1,0 +1,12 @@
+{
+  "name": "golf-autobook",
+  "version": "0.1.0",
+  "private": true,
+  "description": "임팩트비전 자동예약 — 미리 적어둔 날짜·시간을 자정 정각에 대신 예약하는 사이트",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "web": "node --disable-warning=ExperimentalWarning src/web.js",
+    "midnight": "node --disable-warning=ExperimentalWarning src/job.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  }
+}

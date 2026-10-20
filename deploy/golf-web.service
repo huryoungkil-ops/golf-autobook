@@ -1,0 +1,22 @@
+[Unit]
+Description=임팩트비전 자동예약 웹 (127.0.0.1:5720, 바깥 HTTPS 는 Caddy)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=golf
+WorkingDirectory=/opt/golf-autobook
+# 카페24 서버엔 IPv6가 없다 → IPv4 먼저
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning --dns-result-order=ipv4first --no-network-family-autoselection src/web.js
+Restart=always
+RestartSec=5
+Environment=TZ=Asia/Seoul PORT=5720 HOST=127.0.0.1
+MemoryMax=160M
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/golf-autobook/data
+
+[Install]
+WantedBy=multi-user.target

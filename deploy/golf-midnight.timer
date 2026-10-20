@@ -1,0 +1,11 @@
+[Unit]
+Description=임팩트비전 자동예약 — 매일 23:58:30 (정각 전에 미리 로그인)
+
+[Timer]
+OnCalendar=*-*-* 23:58:30 Asia/Seoul
+AccuracySec=1s
+Persistent=false
+Unit=golf-midnight.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=임팩트비전 자동예약 — 자정 예약 작업 (23:58:30 시작, 00:00:00 정각 시도)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=golf
+WorkingDirectory=/opt/golf-autobook
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning --dns-result-order=ipv4first --no-network-family-autoselection src/job.js
+Environment=TZ=Asia/Seoul
+TimeoutStartSec=30min
+MemoryMax=200M
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/golf-autobook/data
