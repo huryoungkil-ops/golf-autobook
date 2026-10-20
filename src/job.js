@@ -10,13 +10,14 @@ const notify = require('./notify');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const nextDay = (d) => new Date(Date.parse(d + 'T00:00:00Z') + 86400e3).toISOString().slice(0, 10);
+const START_DELAY_SEC = Number(process.env.START_DELAY_SEC || 60);
 const NOW_MODE = process.argv.includes('--now');
 
 async function main() {
   const kstHour = new Date(Date.now() + 9 * 3600e3).getUTCHours();
   // 저녁에 시작했으면 내일이 «오늘», 자정 넘어 시작했으면(지연) 오늘
   const openDay = NOW_MODE || kstHour < 12 ? kstToday(0) : kstToday(1);
-  const midnight = Date.parse(`${openDay}T00:00:00+09:00`) + 300; // 0.3초 여유
+  const midnight = Date.parse(`${openDay}T00:00:00+09:00`) + START_DELAY_SEC * 1000; // 사용자 요청(10-21): 정각 말고 00:01
 
   // 지난 날짜는 닫는다
   for (const r of all("SELECT * FROM requests WHERE status='대기' AND target_date < ?", openDay)) {
