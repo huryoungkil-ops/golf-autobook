@@ -97,6 +97,15 @@ async function refreshBays(user, session) {
   return bays;
 }
 
+const nowKst = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
+
+async function myList(user) {
+  if (!user.iv_pw_enc) throw new Error('임팩트비전 계정을 먼저 저장해 주세요');
+  const lr = await loginUser(user);
+  if (!lr.ok) throw new Error(`임팩트비전 로그인 실패: ${lr.msg}`);
+  return lr.session.myReservations();
+}
+
 // 로그인 실패 잠금 (5번 틀리면 15분)
 function isLocked(u) { return u && u.locked_until && u.locked_until > now(); }
 
@@ -109,6 +118,7 @@ async function handle(req, res) {
   const M = req.method;
   const user = currentUser(req);
 
+  if (p === '/icon.svg' || p === '/favicon.ico') { res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }); return res.end(pages.ICON_SVG); }
   if (p === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }
   if (M === 'GET' && p === '/') return send(res, 200, pages.landing({ loggedIn: !!user }));
   if (M === 'GET' && p === '/login') return user ? redirect(res, '/app') : send(res, 200, pages.loginPage());
@@ -183,6 +193,16 @@ async function handle(req, res) {
       flash: url.searchParams.get('m') || url.searchParams.get('e') || '', flashErr: url.searchParams.has('e'),
       kakaoReady: !!KAKAO_REST_KEY, slotsView, today: kstToday(0), dateChoices: dateChoices(), dayLabel,
     }));
+  }
+
+  // 임팩트비전에 실제로 잡혀 있는 예약 (화면이 불러 쓰는 조각)
+  if (M === 'GET' && p === '/app/mine') {
+    let html;
+    try {
+      const list = await myList(user);
+      html = pages.mineFragment(list, nowKst());
+    } catch (e) { html = pages.mineFragment(null, nowKst(), e.message); }
+    return send(res, 200, html);
   }
 
   if (M === 'GET' && p === '/kakao/start') {
@@ -283,6 +303,28 @@ async function handle(req, res) {
     } catch (e) { view = { date, times: [], error: e.message }; }
     slotsCache.set(user.id, view);
     return redirect(res, '/app#check');
+  }
+
+  if (p === '/app/mine/cancel') {
+    const idx = String(b.get('idx') || '');
+    const lr = await loginUser(user).catch((e) => ({ ok: false, msg: e.message }));
+    if (!lr.ok) return back(res, `임팩트비전 로그인 실패: ${lr.msg}`, true);
+    // 내 예약 목록에 있는, 아직 지나지 않은 예약만 취소한다
+    const list = await lr.session.myReservations();
+    const r = list.find((x) => x.idx === idx);
+    if (!r) return back(res, '내 예약 목록에서 그 예약을 찾지 못했습니다. 새로고침해 주세요.', true);
+    if (!pages.isCancellable(r, nowKst())) return back(res, '이미 지났거나 취소할 수 없는 예약입니다.', true);
+    const what = `${dayLabel(r.date)} ${r.time}${r.bay ? ' ' + r.bay + ' 타석' : ''} · ${r.shop}`;
+    const c = await lr.session.cancel(idx);
+    log(user.id, null, `예약 취소 ${idx} ${what}: ${c.ok ? '성공' : '실패'} ${c.msg}`);
+    if (!c.ok) return back(res, `취소하지 못했습니다: ${c.msg}`, true);
+    // 정말 빠졌는지 목록을 다시 본다
+    const after = await lr.session.myReservations().catch(() => null);
+    const still = after && after.find((x) => x.idx === idx && pages.isCancellable(x, nowKst()));
+    if (still) return back(res, `임팩트비전이 «${c.msg}» 라고 했지만 목록에 아직 남아 있습니다. 임팩트비전에서 확인해 주세요.`, true);
+    run("UPDATE requests SET status='취소', result_msg=?, updated_at=? WHERE user_id=? AND status='성공' AND target_date=? AND booked_time=?", '예약 취소함', now(), user.id, r.date, r.time);
+    const sent = await notify.toUser(user, `❌ 예약이 취소되었습니다\n${what}`);
+    return back(res, `예약을 취소했습니다 — ${what}${sent.length ? ' (알림 보냄)' : ''}`);
   }
 
   if (p === '/app/discord') {

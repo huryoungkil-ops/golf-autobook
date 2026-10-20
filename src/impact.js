@@ -226,6 +226,24 @@ class ImpactSession {
     return [];
   }
 
+  async myReservations() {
+    const r = await this.req('/m_v3/source-file/reserve_my.php?method=list', { xhr: true });
+    this.snap('my-list', r.text);
+    if (/비정상접근/.test(r.text) && r.text.length < 200) throw new Error('예약 내역 화면 거절 (비정상접근)');
+    return parseMyList(r.text);
+  }
+
+  // 예약 취소 — 사이트의 «취소» 버튼과 같은 요청. 반환 {ok, msg}
+  async cancel(idx) {
+    if (!/^\d+$/.test(String(idx))) return { ok: false, msg: '예약 번호가 이상합니다' };
+    const r = await this.req(`/m_v3/source-file/reserve_exe.php?mod=cancel&cancel_idx=${idx}`, { method: 'POST', body: '', xhr: true });
+    this.snap(`cancel-${idx}`, r.text);
+    let j;
+    try { j = JSON.parse(r.text.trim()); } catch { j = null; }
+    if (!j) return { ok: false, msg: `알 수 없는 응답: ${stripTags(r.text).slice(0, 120)}` };
+    return j.result === 'F' ? { ok: false, msg: j.msg || '취소 실패' } : { ok: true, msg: j.msg || '취소 완료' };
+  }
+
   // 시간 순위대로 예약을 시도한다. 한 시간 안에서는 선호 타석 순서대로.
   // 반환 state: booked(성공) · notopen(시간표가 아직 잠금/없음) · full(원하는 시간·타석이 모두 안 됨)
   async book(shopId, day, times, { bays: preferBays = [], anyBay = true, onLog = () => {} } = {}) {
@@ -283,10 +301,34 @@ class ImpactSession {
   }
 }
 
+// 내 예약 내역 (reserve_my.php?method=list — 최근 10건). 2026-10-21 실제 화면으로 확인:
+// <div class="my-reserve-box-detail"> 매장 · <div class="reserve-time">21:00</div> · <div class="reserve-day">(일) 2026-10-18 <span class="lockidx_num_ico_my">2번 타석</span>
+// 상태 동그라미 <div class="circle-reserve-end" data-cancel-idx="6805391">완료</div> — 지난 예약은 end/«완료»,
+// 앞으로의 예약은 사이트 스크립트상 circle-reserve-cancel (아직 실물 못 봄)
+function parseMyList(html) {
+  const out = [];
+  const parts = html.split(/(?=<div[^>]*class\s*=\s*["']my-reserve-box-detail)/i).slice(1);
+  for (const part of parts) {
+    const time = hhmm(stripTags((part.match(/class\s*=\s*["']reserve-time["'][^>]*>([\s\S]*?)<\/div>/i) || [])[1] || ''));
+    const dayRaw = (part.match(/class\s*=\s*["']reserve-day["'][^>]*>([\s\S]*?)<\/div>/i) || [])[1] || '';
+    const date = (dayRaw.match(/\d{4}-\d{2}-\d{2}/) || [])[0] || '';
+    const bay = stripTags((dayRaw.match(/lockidx_num_ico_my[^>]*>([\s\S]*?)<\/span>/i) || [])[1] || '').replace(/\s*타석$/, '');
+    const shopBlock = (part.match(/font-weight\s*:\s*bold[^>]*>([\s\S]*?)<br/i) || [])[1] || '';
+    const pass = stripTags((part.match(/<font[^>]*>([\s\S]*?)<\/font>/i) || [])[1] || '').replace(/^-/, '');
+    const circle = part.match(/<div\b([^>]*class\s*=\s*["'](circle-reserve[\w-]*)["'][^>]*)>([\s\S]*?)<\/div>/i);
+    const a = circle ? attrs(circle[1]) : {};
+    const cls = circle ? circle[2] : '';
+    const label = circle ? stripTags(circle[3]) : '';
+    if (!date) continue;
+    out.push({ idx: a['data-cancel-idx'] || '', shop: stripTags(shopBlock), pass, date, time, bay, cls, label });
+  }
+  return out;
+}
+
 function setField(fields, name, value) {
   const i = fields.findIndex(([k]) => k === name);
   if (i >= 0) fields[i] = [name, value];
   else fields.push([name, value]);
 }
 
-module.exports = { ImpactSession, parseShops, parseSlots, parseForm, parseConfirm, pickBay, bayKey, parseLoginResult, hhmm };
+module.exports = { ImpactSession, parseShops, parseSlots, parseForm, parseConfirm, parseMyList, pickBay, bayKey, parseLoginResult, hhmm };

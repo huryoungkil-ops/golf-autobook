@@ -21,11 +21,24 @@ input:focus,select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(47,
 label{display:block;font-size:13px;color:var(--mute);margin:12px 0 6px}
 `;
 
+// 탭 아이콘: 초록 잔디 위 깃발과 골프공
+const ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3bea95"/><stop offset="1" stop-color="#0a6a3e"/></linearGradient>
+<radialGradient id="b" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff"/><stop offset=".7" stop-color="#eef3ef"/><stop offset="1" stop-color="#b9cbbf"/></radialGradient></defs>
+<rect width="64" height="64" rx="15" fill="url(#g)"/>
+<ellipse cx="38" cy="51" rx="15" ry="4" fill="#063a22" opacity=".55"/>
+<rect x="36" y="10" width="3.2" height="41" rx="1.6" fill="#fff"/>
+<path d="M39.2 10.5 L55 17 L39.2 23.5 Z" fill="#ff5d5d"/>
+<circle cx="20" cy="45" r="9.5" fill="url(#b)"/>
+<g fill="#c3d2c8"><circle cx="16.5" cy="42" r="1.3"/><circle cx="21" cy="40.5" r="1.3"/><circle cx="24.5" cy="44" r="1.3"/><circle cx="19" cy="46" r="1.3"/><circle cx="16" cy="48.5" r="1.3"/><circle cx="22.5" cy="49.5" r="1.3"/></g>
+</svg>`;
+const ICON_URI = 'data:image/svg+xml,' + encodeURIComponent(ICON_SVG.replace(/\n/g, ''));
+
 function shell(title, body, { css = '', script = '' } = {}) {
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="theme-color" content="#06110c">
 <meta name="description" content="미리 적어둔 날짜와 시간으로, 자정 정각에 임팩트비전 예약을 대신 잡아 드립니다.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23eef6f0'/%3E%3Ccircle cx='24' cy='24' r='3' fill='%23b9c9be'/%3E%3Ccircle cx='36' cy='22' r='3' fill='%23b9c9be'/%3E%3Ccircle cx='30' cy='34' r='3' fill='%23b9c9be'/%3E%3Ccircle cx='42' cy='34' r='3' fill='%23b9c9be'/%3E%3Ccircle cx='24' cy='42' r='3' fill='%23b9c9be'/%3E%3C/svg%3E">
+<link rel="icon" href="${ICON_URI}"><link rel="apple-touch-icon" href="/icon.svg">
 <style>${BASE_CSS}${css}</style></head><body>${body}${script ? `<script>${script}</script>` : ''}</body></html>`;
 }
 
@@ -281,6 +294,18 @@ details summary{cursor:pointer;color:var(--mute);font-size:14px;margin-top:12px}
 .chips span{padding:6px 10px;border-radius:10px;background:rgba(47,224,138,.1);border:1px solid rgba(47,224,138,.3);font-size:14px;font-variant-numeric:tabular-nums}
 .chips span.shut{background:rgba(255,255,255,.04);border-color:var(--line);color:var(--mute)}
 .chips small{font-size:11px;opacity:.8}
+.spin{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid rgba(47,224,138,.25);border-top-color:var(--green);animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.card h2 .btn{font-size:13px;padding:7px 12px}
+.mine{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;padding:14px 0;border-top:1px solid var(--line)}
+.mine:first-child{border-top:0}
+.mine .dt{width:58px;text-align:center;border-radius:14px;padding:8px 4px;background:rgba(47,224,138,.12);border:1px solid rgba(47,224,138,.35)}
+.mine .dt small{display:block;font-size:12px;color:var(--mute)}
+.mine .dt b{font-size:18px}
+.mine.past .dt{background:rgba(255,255,255,.04);border-color:var(--line)}
+.mine.past{opacity:.6}
+.mine .info b{font-size:16px}
+.mine .info div{color:var(--mute);font-size:13px;margin-top:3px}
 label.chk{display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;margin-top:14px;cursor:pointer}
 label.chk input{width:18px;height:18px;accent-color:var(--green);margin:0}
 .btn-sm{padding:9px 14px;font-size:14px}
@@ -305,6 +330,17 @@ function pad(n){return String(n).padStart(2,'0')}
 function tick(){var n=new Date(Date.now()+9*3600e3);var l=86400-(n.getUTCHours()*3600+n.getUTCMinutes()*60+n.getUTCSeconds());
 var el=document.getElementById('cd');if(el)el.textContent=pad(Math.floor(l/3600))+':'+pad(Math.floor(l%3600/60))+':'+pad(l%60)}
 tick();setInterval(tick,1000);
+function bindForms(root){
+root.querySelectorAll('form[data-busy]').forEach(function(f){f.addEventListener('submit',function(){var b=f.querySelector('button');if(b){b.disabled=true;b.textContent=f.dataset.busy}})});
+root.querySelectorAll('form[data-confirm]').forEach(function(f){f.addEventListener('submit',function(e){if(!confirm(f.dataset.confirm))e.preventDefault()})});
+}
+function loadMine(){var el=document.getElementById('mine');if(!el)return;
+el.innerHTML='<p class="desc"><span class="spin"></span> 임팩트비전에서 불러오는 중…</p>';
+fetch('/app/mine',{credentials:'same-origin'}).then(function(r){return r.text()}).then(function(h){
+var t=document.createElement('div');t.innerHTML=h;el.innerHTML='';while(t.firstChild)el.appendChild(t.firstChild);bindForms(el);})
+.catch(function(){el.innerHTML='<p class="desc bad">불러오지 못했습니다. 새로고침을 눌러 주세요.</p>'})}
+loadMine();
+var rl=document.getElementById('mine-reload');if(rl)rl.addEventListener('click',loadMine);
 document.querySelectorAll('form[data-busy]').forEach(function(f){f.addEventListener('submit',function(){var b=f.querySelector('button');if(b){b.disabled=true;b.textContent=f.dataset.busy}})});
 document.querySelectorAll('form[data-confirm]').forEach(function(f){f.addEventListener('submit',function(e){if(!confirm(f.dataset.confirm))e.preventDefault()})});
 `;
@@ -351,6 +387,10 @@ function appPage({ user, shops, requests, flash, flashErr, kakaoReady, slotsView
 <div class="who">${esc(user.login)} 님 <form class="inline" method="post" action="/logout"><button class="btn btn-ghost btn-sm">로그아웃</button></form></div></nav>
 ${flash ? `<div class="flash${flashErr ? ' err' : ''}">${esc(flash)}</div>` : ''}
 <div class="hero"><div><h1>다음 자동 예약까지</h1><p>대기 중인 예약 ${pending.length}건 · 매일 00:00 정각 실행</p></div><div class="cd" id="cd"></div></div>
+
+${ivSet ? `<div class="card" id="mine-card"><h2>📅 내 예약 현황 <button type="button" class="btn btn-ghost btn-sm" id="mine-reload" style="margin-left:auto">새로고침</button></h2>
+<p class="desc">임팩트비전에 실제로 잡혀 있는 예약입니다 (최근 10건).</p>
+<div id="mine"><p class="desc"><span class="spin"></span> 임팩트비전에서 불러오는 중…</p></div></div>` : ''}
 
 <div class="card"><h2>🔑 임팩트비전 계정</h2>
 ${ivSet ? `<p class="desc"><span class="ok">● 저장됨</span> — 아이디 <b>${esc(maskId(user.iv_id))}</b>${user.iv_ok_at ? ` · 마지막 로그인 성공 ${esc(user.iv_ok_at.slice(5, 16))}` : ''}</p>
@@ -421,4 +461,28 @@ ${user.kakao_refresh ? `<p class="desc"><span class="ok">● 연결됨</span>${u
   return shell(`내 예약 · ${NAME}`, body, { css: APP_CSS, script: APP_JS });
 }
 
-module.exports = { landing, loginPage, messagePage, appPage, esc, NAME };
+// 앞으로의 예약이고, 사이트가 «완료/종료»로 표시하지 않았으면 취소 가능
+function isCancellable(r, nowKst) {
+  const when = `${r.date} ${r.time || '23:59'}`;
+  return when > nowKst && !/end/i.test(r.cls) && !/완료|취소됨|종료/.test(r.label);
+}
+
+const DOW_K = ['일', '월', '화', '수', '목', '금', '토'];
+function mineFragment(list, nowKst, error) {
+  if (error) return `<p class="desc bad">${esc(error)}</p>`;
+  if (!list.length) return '<p class="desc">임팩트비전에 예약 내역이 없습니다.</p>';
+  const items = [...list].sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
+  const upcoming = items.filter((r) => isCancellable(r, nowKst)).reverse();
+  const past = items.filter((r) => !isCancellable(r, nowKst));
+  const row = (r, live) => {
+    const [, m, d] = r.date.split('-').map(Number);
+    const w = DOW_K[new Date(r.date + 'T00:00:00Z').getUTCDay()];
+    return `<div class="mine${live ? '' : ' past'}"><div class="dt"><small>${w}</small><b>${m}/${d}</b></div>
+<div class="info"><b>${esc(r.time)}${r.bay ? ` · ${esc(r.bay)} 타석` : ''}</b><div>${esc(r.shop)}${r.pass ? ' · ' + esc(r.pass) : ''}${live ? '' : ` · ${esc(r.label || '지난 예약')}`}</div></div>
+<div>${live && r.idx ? `<form method="post" action="/app/mine/cancel" data-busy="취소 중…" data-confirm="${esc(`${m}/${d}(${w}) ${r.time}${r.bay ? ' ' + r.bay + ' 타석' : ''} 예약을 취소할까요?`)}"><input type="hidden" name="idx" value="${esc(r.idx)}"><button class="btn btn-red btn-sm">예약 취소</button></form>` : ''}</div></div>`;
+  };
+  return (upcoming.length ? upcoming.map((r) => row(r, true)).join('') : '<p class="desc">앞으로 잡혀 있는 예약이 없습니다.</p>')
+    + (past.length ? `<details><summary>지난 예약 ${past.length}건</summary>${past.map((r) => row(r, false)).join('')}</details>` : '');
+}
+
+module.exports = { landing, loginPage, messagePage, appPage, mineFragment, isCancellable, esc, NAME, ICON_SVG };

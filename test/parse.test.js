@@ -91,3 +91,30 @@ test('확인 폼 serialize (약관 동의 포함)', () => {
   <select name="people"><option value="1">1</option><option value="2" selected>2</option></select><button type="button">예약</button></form>`;
   assert.deepEqual(parseForm(html, 'reserve-confirm'), [['sday', '2026-10-22'], ['memo', ''], ['agree', 'Y'], ['people', '2']]);
 });
+
+// 2026-10-21 실제 «예약내역» 화면에서 줄인 것 (+ 앞으로의 예약 한 건은 사이트 스크립트대로 circle-reserve-cancel 로 가정)
+const REAL_MY = `<div class="my-reserve-list">
+ <div class="my-reserve-box-detail"><div><div style="float:left;">
+ <div style="clear:both;font-weight:bold;">DMC아트포레자이아파트 <br><font style="font-size:10pt;color:#3e3e3e">-이용권 </font></div>
+ <div class="reserve-time">21:00 </div>
+ <div class="reserve-day">(일) 2026-10-18 <!--주석--> <span class="lockidx_num_ico_my">2번 타석</span> </div></div>
+ <div style="float:right;"><div class="circle-reserve-end" data-cancel-idx="6805391">완료 </div></div></div></div>
+ <div class="my-reserve-box-detail"><div><div style="float:left;">
+ <div style="clear:both;font-weight:bold;">DMC아트포레자이아파트 <br><font>-이용권 </font></div>
+ <div class="reserve-time">19:00</div><div class="reserve-day">(금) 2026-10-23 <span class="lockidx_num_ico_my">5번 우타 타석</span></div></div>
+ <div style="float:right;"><div class="circle-reserve-cancel" data-cancel-idx="6810001">취소</div></div></div></div>
+</div>`;
+
+test('실제 예약내역: 날짜·시간·타석·취소 번호', () => {
+  const { parseMyList } = require('../src/impact');
+  const { isCancellable, mineFragment } = require('../src/pages');
+  const l = parseMyList(REAL_MY);
+  assert.equal(l.length, 2);
+  assert.deepEqual([l[0].date, l[0].time, l[0].bay, l[0].idx, l[0].shop, l[0].pass, l[0].label], ['2026-10-18', '21:00', '2번', '6805391', 'DMC아트포레자이아파트', '이용권', '완료']);
+  assert.equal(l[1].bay, '5번 우타');
+  assert.equal(isCancellable(l[0], '2026-10-21 00:10'), false);
+  assert.equal(isCancellable(l[1], '2026-10-21 00:10'), true);
+  const h = mineFragment(l, '2026-10-21 00:10');
+  assert.match(h, /name="idx" value="6810001"/);
+  assert.doesNotMatch(h, /value="6805391"/);
+});
