@@ -217,17 +217,26 @@ h1{font-size:26px;margin:0 0 6px;letter-spacing:-.03em}
 .mute{color:var(--mute);font-size:14px;line-height:1.6}
 .err{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.35);color:#ffc9c9;border-radius:12px;padding:12px 14px;margin:14px 0;font-size:14px;line-height:1.5}
 .btn{width:100%;margin-top:18px}
+.warn{display:flex;gap:12px;align-items:flex-start;margin:14px 0 10px;padding:16px;border-radius:16px;background:linear-gradient(135deg,rgba(255,209,102,.18),rgba(255,140,60,.12));border:1.5px solid rgba(255,209,102,.7);box-shadow:0 0 0 4px rgba(255,209,102,.08);animation:warnin .6s ease-out}
+.warn .wi{font-size:28px;line-height:1}
+.warn b{display:block;color:#ffe08a;font-size:17px;letter-spacing:-.02em;margin-bottom:6px}
+.warn span{color:#fff1cf;font-size:14px;line-height:1.6}
+.warn u{text-decoration-color:#ffd166;text-underline-offset:3px;font-weight:700}
+@keyframes warnin{0%{transform:scale(.97);opacity:0}60%{transform:scale(1.01)}100%{transform:none;opacity:1}}
+.tag{font-style:normal;font-size:11px;font-weight:800;color:#ffd166;background:rgba(255,209,102,.14);border:1px solid rgba(255,209,102,.4);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:1px}
 body{background:radial-gradient(900px 400px at 50% -10%,rgba(47,224,138,.15),transparent 60%),var(--bg)}
 `;
 
 function loginPage({ error = '', login = '' } = {}) {
   const body = `<div class="box"><a class="logo" href="/"><span class="ball"></span>${NAME}</a>
 <div class="card"><h1>로그인</h1>
-<p class="mute">이 사이트 전용 아이디와 비밀번호입니다 (임팩트비전 계정이 아니에요).<br>처음 쓰는 아이디면 바로 가입됩니다.</p>
+<div class="warn"><div class="wi">⚠️</div><div><b>임팩트비전 아이디·비밀번호가 아닙니다!</b>
+<span>이 사이트에서만 쓰는 <u>새 아이디와 비밀번호</u>를 정해 주세요. 임팩트비전 계정은 로그인한 다음 화면에서 따로 입력합니다.</span></div></div>
+<p class="mute">처음 쓰는 아이디면 바로 가입됩니다.</p>
 ${error ? `<div class="err">${error}</div>` : ''}
 <form method="post" action="/login" autocomplete="on">
-<label for="login">아이디</label><input id="login" name="login" value="${esc(login)}" required maxlength="20" autocomplete="username" placeholder="예: golfking">
-<label for="pw">비밀번호 (4자 이상)</label><input id="pw" name="pw" type="password" required minlength="4" maxlength="64" autocomplete="current-password">
+<label for="login">이 사이트 아이디 <em class="tag">임팩트비전 아님</em></label><input id="login" name="login" value="${esc(login)}" required maxlength="20" autocomplete="username" placeholder="예: golfking">
+<label for="pw">이 사이트 비밀번호 (4자 이상) <em class="tag">임팩트비전 아님</em></label><input id="pw" name="pw" type="password" required minlength="4" maxlength="64" autocomplete="current-password">
 <button class="btn btn-main">들어가기</button></form>
 <p class="mute" style="margin-top:18px">아이디·비밀번호를 잊으면 운영자에게 초기화를 요청해 주세요. 이메일·전화번호는 받지 않습니다.</p>
 </div></div>`;
