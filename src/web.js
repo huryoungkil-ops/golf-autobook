@@ -214,7 +214,8 @@ async function handle(req, res) {
     const allowed = new Set(dateChoices().map((d) => d.date));
     const dates = [...new Set(b.getAll('date'))].filter((d) => allowed.has(d));
     if (!dates.length) return back(res, '날짜를 하나 이상 골라 주세요 (내일부터 2주, 월요일 제외).', true);
-    const times = [...new Set([b.get('t1'), b.get('t2'), b.get('t3')].map(hhmm).filter(Boolean))];
+    // 1시간 단위, 09:00 ~ 21:00 만
+    const times = [...new Set([b.get('t1'), b.get('t2'), b.get('t3')].map(hhmm).filter((t) => /^(09|1\d|20|21):00$/.test(t)))];
     if (!times.length) return back(res, '1순위 시간을 골라 주세요.', true);
     if (one("SELECT COUNT(*) n FROM requests WHERE user_id=? AND status='대기'", user.id).n + dates.length > 20) return back(res, '대기 중인 예약은 한 사람당 20건까지입니다.', true);
     let added = 0;

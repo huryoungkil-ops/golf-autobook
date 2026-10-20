@@ -171,7 +171,7 @@ function landing({ loggedIn }) {
  <p class="sub">처음 한 번만 설정하면 됩니다. 계정과 단골 매장은 기억해 두니, 다음부터는 날짜와 시간만 고르세요.</p>
  <div class="grid">
   <div class="feat"><div class="ic">🌙</div><h3>자정 정각 자동 예약</h3><p>23:58에 미리 로그인해 대기하다가 00:00:00에 바로 예약합니다. 사람 손보다 빠릅니다.</p></div>
-  <div class="feat"><div class="ic">🥇</div><h3>1·2·3순위 시간</h3><p>19시가 이미 찼다면? 19시 30분, 20시 순서로 다음 순위 시간을 이어서 시도합니다.</p></div>
+  <div class="feat"><div class="ic">🥇</div><h3>1·2·3순위 시간</h3><p>19시가 이미 찼다면? 20시, 18시처럼 정해 둔 다음 순위 시간을 이어서 시도합니다.</p></div>
   <div class="feat"><div class="ic">📍</div><h3>단골 매장 기억</h3><p>가입한 매장 목록을 자동으로 불러와 드롭다운에 보여 줍니다. 한 번 고르면 바꿀 때까지 그대로예요.</p></div>
   <div class="feat"><div class="ic">🔔</div><h3>카카오톡·디스코드 알림</h3><p>성공하면 바로 알려 드리고, 못 잡았으면 그 이유까지 알려 드립니다. 아침에 확인만 하세요.</p></div>
   <div class="feat"><div class="ic">🔐</div><h3>계정은 암호화 보관</h3><p>임팩트비전 비밀번호는 암호화해서 저장하고, 예약할 때만 잠깐 풀어 씁니다. 화면에는 다시 보이지 않습니다.</p></div>
@@ -307,8 +307,9 @@ document.querySelectorAll('form[data-confirm]').forEach(function(f){f.addEventLi
 
 function timeOptions(selected) {
   let o = '<option value="">— 선택 안 함 —</option>';
-  for (let h = 0; h < 24; h++) for (const m of ['00', '30']) {
-    const t = `${String(h).padStart(2, '0')}:${m}`;
+  // 예약은 1시간 단위, 09:00 ~ 21:00
+  for (let h = 9; h <= 21; h++) {
+    const t = `${String(h).padStart(2, '0')}:00`;
     o += `<option value="${t}"${t === selected ? ' selected' : ''}>${t}</option>`;
   }
   return o;
