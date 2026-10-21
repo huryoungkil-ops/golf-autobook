@@ -3,6 +3,7 @@ const { ImpactSession } = require('./impact');
 const { one, run, now, log } = require('./db');
 const { decrypt } = require('./secure');
 const notify = require('./notify');
+const { FEED_SKIP_LOGINS } = require('./env');
 
 const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 function dayLabel(d) {
@@ -45,6 +46,18 @@ async function attempt(session, req, { final = false, lastTry = false, quiet = f
   if (res.state === 'booked') {
     const rank = times.indexOf(res.time) + 1;
     run("UPDATE requests SET status='성공', booked_time=?, booked_bay=?, result_msg=?, updated_at=? WHERE id=?", res.time, res.bay || null, [res.msg, res.bayNote].filter(Boolean).join(' · '), now(), req.id);
+    if (!FEED_SKIP_LOGINS.includes(user.login)) {
+      await notify.feed([
+        `⛳ **${user.login}** 님 예약 성공${res.dry ? ' (시험 모드)' : ''}`,
+        `· 날짜·시간: **${dayLabel(req.target_date)} ${res.time}${res.end ? '~' + res.end : ''}**`,
+        `· 매장: ${req.shop_name || req.shop_id}${res.bay ? ` · **${res.bay} 타석**` : ''}`,
+        `· 희망 순서: ${times.join(' → ')} 중 ${rank}순위로 잡음`,
+        req.bays_json && JSON.parse(req.bays_json).length ? `· 원한 타석: ${JSON.parse(req.bays_json).join(' → ')}${req.any_bay === 0 ? ' (이 타석만)' : ''}` : '',
+        res.bayNote ? `· 참고: ${res.bayNote}` : '',
+        `· 방식: ${quiet ? '«지금 시도» 버튼' : '자정 자동 예약'} · ${now().slice(5, 19)}`,
+        `· 임팩트비전 응답: ${res.msg || '-'}`,
+      ].filter(Boolean).join('\n'));
+    }
     await say(`⛳ 예약 성공${res.dry ? ' (시험 모드)' : ''}\n${where} ${res.time}${res.end ? '~' + res.end : ''}${res.bay ? ' · ' + res.bay + ' 타석' : ''} (${rank}순위)\n${res.msg || ''}${res.bayNote ? '\n' + res.bayNote : ''}`);
   } else if (quietFail) {
     run('UPDATE requests SET result_msg=?, updated_at=? WHERE id=?', res.msg, now(), req.id);

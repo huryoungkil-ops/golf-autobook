@@ -139,6 +139,7 @@ async function handle(req, res) {
       u = one('SELECT * FROM users WHERE login=?', login);
       isNew = true;
       notify.owner(`🙋 임팩트비전 자동예약 새 가입 — ${login} (${now()})\n${PUBLIC_BASE}`);
+      notify.feed(`🙋 **새 회원 가입**\n· 아이디: **${login}**\n· 가입 시각: ${now()}\n· 전체 회원: ${n + 1}명 (최대 ${MAX_USERS}명)\n· 다음 할 일: 임팩트비전 계정 연결 → 단골 매장 → 예약 걸기\n${PUBLIC_BASE}`);
     } else if (!checkPw(pw, u.pw_hash)) {
       const fails = (u.fail_count || 0) + 1;
       const lock = fails >= 5 ? new Date(Date.now() + 9 * 3600e3 + 15 * 60e3).toISOString().replace('T', ' ').slice(0, 19) : null;

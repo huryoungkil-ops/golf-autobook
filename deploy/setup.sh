@@ -17,6 +17,9 @@ PUBLIC_BASE=https://impactvision.mooo.com
 SECRET_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")
 # 운영자 디스코드 (가입·밤사이 결과·이상), 카카오(경매알리미와 같은 앱)
 OWNER_WEBHOOK=
+# 회원 소식 채널 (새 가입·다른 회원 예약 성공), 소식에서 뺄 아이디(쉼표)
+FEED_WEBHOOK=
+FEED_SKIP_LOGINS=
 KAKAO_REST_KEY=
 KAKAO_CLIENT_SECRET=
 MAX_USERS=30

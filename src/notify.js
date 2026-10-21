@@ -1,6 +1,6 @@
 // 알림: 사용자별 디스코드 웹훅 · 카카오톡 «나에게 보내기» (경매알리미와 같은 방식), 운영자 디스코드
 const { run } = require('./db');
-const { OWNER_WEBHOOK, KAKAO_REST_KEY, KAKAO_CLIENT_SECRET, PUBLIC_BASE } = require('./env');
+const { OWNER_WEBHOOK, FEED_WEBHOOK, KAKAO_REST_KEY, KAKAO_CLIENT_SECRET, PUBLIC_BASE } = require('./env');
 
 const DISCORD_RE = /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+$/;
 
@@ -13,6 +13,8 @@ async function discord(url, content) {
 }
 
 const owner = (content) => discord(OWNER_WEBHOOK, content);
+// 회원 소식 채널 (없으면 조용히 넘어감)
+const feed = (content) => (FEED_WEBHOOK ? discord(FEED_WEBHOOK, content) : Promise.resolve({ ok: false, why: '소식 채널 없음' }));
 
 async function kakaoToken(form) {
   const r = await fetch('https://kauth.kakao.com/oauth/token', {
@@ -58,4 +60,4 @@ async function toUser(user, text) {
   return out;
 }
 
-module.exports = { DISCORD_RE, discord, owner, kakao, kakaoToken, kakaoAuthUrl, kakaoRedirect, kakaoSendWithAccess, toUser };
+module.exports = { DISCORD_RE, discord, owner, feed, kakao, kakaoToken, kakaoAuthUrl, kakaoRedirect, kakaoSendWithAccess, toUser };

@@ -21,6 +21,9 @@ module.exports = {
   SECRET_KEY: E.SECRET_KEY || '',
   // 운영자(주인장) 디스코드 — 가입·밤사이 결과 요약·이상 알림
   OWNER_WEBHOOK: E.OWNER_WEBHOOK || '',
+  // 회원 소식 채널 (새 가입 · 다른 회원 예약 성공을 자세히). FEED_SKIP_LOGINS 에 적은 아이디(쉼표)는 예약 소식에서 뺀다
+  FEED_WEBHOOK: E.FEED_WEBHOOK || '',
+  FEED_SKIP_LOGINS: (E.FEED_SKIP_LOGINS || '').split(',').map((s) => s.trim()).filter(Boolean),
   KAKAO_REST_KEY: E.KAKAO_REST_KEY || '',
   KAKAO_CLIENT_SECRET: E.KAKAO_CLIENT_SECRET || '',
   MAX_USERS: Number(E.MAX_USERS || 30),
