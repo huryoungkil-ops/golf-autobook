@@ -9,6 +9,7 @@ REPO_URL=${REPO_URL:-git@github.com-golf:huryoungkil-ops/golf-autobook.git}
 id golf >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin golf
 [ -d "$APP/.git" ] || git clone "$REPO_URL" "$APP"
 mkdir -p "$APP/data" /var/backups/golf-autobook
+chmod 700 "$APP/data" /var/backups/golf-autobook
 if [ ! -f "$APP/.env" ]; then
   cat > "$APP/.env" <<ENV
 PUBLIC_BASE=https://impactvision.mooo.com

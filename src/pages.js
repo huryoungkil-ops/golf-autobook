@@ -306,6 +306,10 @@ details summary{cursor:pointer;color:var(--mute);font-size:14px;margin-top:12px}
 .mine.past{opacity:.6}
 .mine .info b{font-size:16px}
 .mine .info div{color:var(--mute);font-size:13px;margin-top:3px}
+.lock{display:flex;gap:12px;margin:12px 0 4px;padding:14px 16px;border-radius:14px;background:rgba(94,240,255,.07);border:1px solid rgba(94,240,255,.35)}
+.lock .li{font-size:22px;line-height:1.2}
+.lock b{color:#bff7ff}
+.lock ul{margin:6px 0 0;padding-left:18px;color:var(--mute);font-size:13px;line-height:1.7}
 label.chk{display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;margin-top:14px;cursor:pointer}
 label.chk input{width:18px;height:18px;accent-color:var(--green);margin:0}
 .btn-sm{padding:9px 14px;font-size:14px}
@@ -394,8 +398,14 @@ ${ivSet ? `<div class="card" id="mine-card"><h2>📅 내 예약 현황 <button t
 
 <div class="card"><h2>🔑 임팩트비전 계정</h2>
 ${ivSet ? `<p class="desc"><span class="ok">● 저장됨</span> — 아이디 <b>${esc(maskId(user.iv_id))}</b>${user.iv_ok_at ? ` · 마지막 로그인 성공 ${esc(user.iv_ok_at.slice(5, 16))}` : ''}</p>
+<p class="desc">🔒 비밀번호는 <b>암호화되어</b> 서버에 보관 중입니다.</p>
 ${user.iv_err ? `<p class="desc bad">최근 로그인 실패: ${esc(user.iv_err)}</p>` : ''}
-<details><summary>계정 바꾸기</summary>` : '<p class="desc">예약에 쓸 임팩트비전 아이디와 비밀번호를 한 번만 입력하세요. 비밀번호는 암호화해서 저장하고 다시 보여 드리지 않습니다.</p>'}
+<details><summary>계정 바꾸기</summary>` : '<p class="desc">예약에 쓸 임팩트비전 아이디와 비밀번호를 한 번만 입력하세요.</p>'}
+<div class="lock"><div class="li">🔒</div><div><b>비밀번호는 암호화되어 저장됩니다</b>
+<ul><li>입력한 순간부터 HTTPS(암호화 통신)로 서버까지 전달됩니다.</li>
+<li>서버에서는 <b>AES-256</b>으로 암호화해 보관하고, 원래 비밀번호는 어디에도 남기지 않습니다.</li>
+<li>암호를 푸는 열쇠는 서버의 잠긴 설정 파일에만 있고, 자정에 임팩트비전에 로그인하는 순간에만 잠깐 풀어 씁니다.</li>
+<li>저장한 비밀번호는 이 화면에 다시 보여 드리지 않습니다.</li></ul></div></div>
 <form method="post" action="/app/iv" data-busy="로그인 확인 중…"><div class="row">
 <div><label>임팩트비전 아이디</label><input name="iv_id" required autocomplete="off" value=""></div>
 <div><label>임팩트비전 비밀번호</label><input name="iv_pw" type="password" required autocomplete="new-password"></div></div>

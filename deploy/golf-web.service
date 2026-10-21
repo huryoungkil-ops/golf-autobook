@@ -12,6 +12,8 @@ ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning --dns-result-order
 Restart=always
 RestartSec=5
 Environment=TZ=Asia/Seoul PORT=5720 HOST=127.0.0.1
+# DB·화면 사본은 golf 계정만 읽게
+UMask=0077
 MemoryMax=160M
 NoNewPrivileges=true
 ProtectSystem=full

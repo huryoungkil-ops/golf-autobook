@@ -8,6 +8,7 @@ User=golf
 WorkingDirectory=/opt/golf-autobook
 ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning --dns-result-order=ipv4first --no-network-family-autoselection src/job.js
 Environment=TZ=Asia/Seoul
+UMask=0077
 TimeoutStartSec=30min
 MemoryMax=200M
 NoNewPrivileges=true
