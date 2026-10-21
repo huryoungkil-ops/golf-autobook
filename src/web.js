@@ -1,5 +1,8 @@
 // 웹 서버 (node:http, 외부 패키지 없음). 127.0.0.1:5720 — 바깥 HTTPS 는 Caddy 가 받아 넘긴다.
 const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const push = require('./push');
 const { PORT, HOST, MAX_USERS, KAKAO_REST_KEY, PUBLIC_BASE } = require('./env');
 const { one, all, run, now, log } = require('./db');
 const { hashPw, checkPw, encrypt, token } = require('./secure');
@@ -40,6 +43,32 @@ async function readBody(req) {
   for await (const c of req) { size += c.length; if (size > 64 * 1024) throw new Error('too big'); chunks.push(c); }
   return new URLSearchParams(Buffer.concat(chunks).toString('utf8'));
 }
+async function readJson(req) {
+  let size = 0;
+  const chunks = [];
+  for await (const c of req) { size += c.length; if (size > 16 * 1024) throw new Error('too big'); chunks.push(c); }
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return {}; }
+}
+function sendJson(res, status, obj) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(JSON.stringify(obj));
+}
+// 기기 알림용 파일 (public/). 서비스워커·스크립트는 바로 바뀌게 no-cache
+const PUB = path.join(__dirname, '..', 'public');
+const STATIC = {
+  '/sw.js': { file: 'sw.js', type: 'text/javascript; charset=utf-8', cache: 'no-cache' },
+  '/push-client.js': { file: 'push-client.js', type: 'text/javascript; charset=utf-8', cache: 'no-cache' },
+  '/icon-192.png': { file: 'icon-192.png', type: 'image/png', cache: 'public, max-age=86400' },
+  '/icon-512.png': { file: 'icon-512.png', type: 'image/png', cache: 'public, max-age=86400' },
+  '/apple-touch-icon.png': { file: 'apple-touch-icon.png', type: 'image/png', cache: 'public, max-age=86400' },
+};
+for (const f of Object.values(STATIC)) f.body = fs.readFileSync(path.join(PUB, f.file));
+STATIC['/manifest.webmanifest'] = { type: 'application/manifest+json; charset=utf-8', cache: 'no-cache', body: JSON.stringify({
+  name: pages.NAME, short_name: '자동예약', description: '미리 적어둔 날짜와 시간으로, 자정에 임팩트비전 예약을 대신 잡아 드립니다.',
+  start_url: '/app', scope: '/', display: 'standalone', background_color: '#06110c', theme_color: '#06110c', lang: 'ko',
+  icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }],
+}, null, 1) };
+
 function send(res, status, html, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin', ...headers });
   res.end(html);
@@ -120,6 +149,18 @@ async function handle(req, res) {
 
   if (p === '/icon.svg' || p === '/favicon.ico') { res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }); return res.end(pages.ICON_SVG); }
   if (p === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }
+  if ((M === 'GET' || M === 'HEAD') && STATIC[p]) {
+    const f = STATIC[p];
+    res.writeHead(200, { 'Content-Type': f.type, 'Cache-Control': f.cache, ...(p === '/sw.js' ? { 'Service-Worker-Allowed': '/' } : {}) });
+    return res.end(M === 'HEAD' ? undefined : f.body);
+  }
+  // 기기 알림 (화면의 push-client.js 가 부른다). JSON 으로만 받는다 — 다른 사이트의 폼이 몰래 보내지 못하게
+  let pm = p.match(/^\/push\/([a-z-]+)$/);
+  if (pm && M === 'POST') {
+    if (!String(req.headers['content-type'] || '').startsWith('application/json')) return sendJson(res, 415, { ok: false, error: 'JSON 으로 보내 주세요.' });
+    const r = await push().api(pm[1], user ? String(user.id) : null, await readJson(req), req.headers['user-agent']);
+    return sendJson(res, r.status, r.json);
+  }
   if (M === 'GET' && p === '/') return send(res, 200, pages.landing({ loggedIn: !!user }));
   if (M === 'GET' && p === '/login') return user ? redirect(res, '/app') : send(res, 200, pages.loginPage());
 
@@ -197,6 +238,8 @@ async function handle(req, res) {
   }
 
   // 임팩트비전에 실제로 잡혀 있는 예약 (화면이 불러 쓰는 조각)
+  if (M === 'GET' && p === '/notices') return send(res, 200, pages.noticesPage({ user }));
+
   if (M === 'GET' && p === '/app/mine') {
     let html;
     try {

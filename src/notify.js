@@ -1,5 +1,6 @@
 // 알림: 사용자별 디스코드 웹훅 · 카카오톡 «나에게 보내기» (경매알리미와 같은 방식), 운영자 디스코드
 const { run } = require('./db');
+const push = require('./push');
 const { OWNER_WEBHOOK, FEED_WEBHOOK, KAKAO_REST_KEY, KAKAO_CLIENT_SECRET, PUBLIC_BASE } = require('./env');
 
 const DISCORD_RE = /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+$/;
@@ -52,11 +53,15 @@ async function kakao(user, text) {
   } catch (e) { return { ok: false, why: e.message }; }
 }
 
-// 사용자에게 (연결된 곳 모두로)
+// 사용자에게 (연결된 곳 모두로). 사이트 알림함에는 항상 남기고, 알림을 켠 기기가 있으면 그 기기로도 보낸다
 async function toUser(user, text) {
   const out = [];
   if (user.discord_url) out.push(['디스코드', await discord(user.discord_url, text)]);
   if (user.kakao_refresh) out.push(['카카오톡', await kakao(user, text)]);
+  try {
+    const r = await push().notify(String(user.id), { body: text });
+    if (r.devices) out.push(['이 기기 알림', { ok: r.ok > 0, why: r.ok ? '' : (r.errors[0] || (r.gone ? '기기에서 알림이 꺼짐' : '보내지 못함')) }]);
+  } catch (e) { out.push(['이 기기 알림', { ok: false, why: e.message }]); }
   return out;
 }
 

@@ -38,7 +38,8 @@ function shell(title, body, { css = '', script = '' } = {}) {
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(title)}</title><meta name="theme-color" content="#06110c">
 <meta name="description" content="미리 적어둔 날짜와 시간으로, 자정 정각에 임팩트비전 예약을 대신 잡아 드립니다.">
-<link rel="icon" href="${ICON_URI}"><link rel="apple-touch-icon" href="/icon.svg">
+<link rel="icon" href="${ICON_URI}"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="자동예약">
 <style>${BASE_CSS}${css}</style></head><body>${body}${script ? `<script>${script}</script>` : ''}</body></html>`;
 }
 
@@ -368,6 +369,41 @@ function maskId(id) {
   return s.length <= 3 ? s[0] + '**' : s.slice(0, 3) + '*'.repeat(Math.max(2, s.length - 3));
 }
 
+// ── 기기 알림 · 알림함 (public/push-client.js 를 이 사이트 색에 맞춘다) ──
+const PUSH_CSS = `
+:root{--pb-accent:var(--green);--pb-accent-text:#05210f;--pb-card:var(--card)}
+.nav-noti{position:relative;color:var(--text);text-decoration:none;font-weight:700;padding:6px 4px;white-space:nowrap}
+.who .btn{white-space:nowrap}
+@media (max-width:560px){.who .uname{display:none}}
+.nbadge{display:inline-block;min-width:18px;height:18px;line-height:18px;padding:0 5px;margin-left:4px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;font-weight:800;text-align:center;vertical-align:1px}
+.pushwrap{margin:14px 0 6px;padding:16px;border-radius:16px;background:rgba(47,224,138,.06);border:1px solid rgba(47,224,138,.25)}
+body .pb-desc,body .pb-msg{color:var(--mute)}
+body .pb-btn{border-radius:12px}
+body .pb-btn.pb-sub{border-color:rgba(255,255,255,.18)}
+body .pb-warn{background:rgba(255,209,102,.08);border-color:rgba(255,209,102,.35);color:#ffe2a6}
+body .pb-item{border-color:var(--line);color:var(--text)}
+body .pb-item.pb-new{border-color:rgba(47,224,138,.55)}
+body .pb-ititle,body .pb-time{color:var(--mute)}
+body .pb-readall{color:var(--mute)}
+body .pb-head h2{font-size:22px}
+`;
+const PUSH_JS = `
+if(window.PushBox){
+PushBox.mount(document.getElementById('push-box'),{api:'/push'});
+PushBox.unread({api:'/push'}).then(function(n){var b=document.getElementById('noti-n');if(b&&n){b.textContent=n>99?'99+':n;b.hidden=false}});
+}
+`;
+
+function noticesPage({ user }) {
+  const body = `<div class="wrap">
+<nav><a class="logo" href="/app"><span class="ball"></span>${NAME}</a>
+<div class="who"><a class="nav-noti" href="/app">← 내 예약</a> ${esc(user.login)} 님</div></nav>
+<div class="card" id="inbox"></div>
+<p class="desc mute" style="font-size:13px">최근 100건까지 보관합니다. 휴대폰·PC로 바로 받으려면 <a href="/app#noti-card">내 예약 → 알림 받을 곳</a>에서 «이 기기에서 알림 받기»를 눌러 주세요.</p>
+</div><script src="/push-client.js"></script>`;
+  return shell(`알림 · ${NAME}`, body, { css: APP_CSS + PUSH_CSS, script: "if(window.PushBox)PushBox.inbox(document.getElementById('inbox'),{api:'/push'});" });
+}
+
 function appPage({ user, shops, requests, flash, flashErr, kakaoReady, slotsView, today, dateChoices, dayLabel }) {
   const pendingDates = new Set(requests.filter((r) => r.status === '대기').map((r) => r.target_date));
   const bays = user.bays_json ? JSON.parse(user.bays_json) : [];
@@ -388,7 +424,7 @@ function appPage({ user, shops, requests, flash, flashErr, kakaoReady, slotsView
 
   const body = `<div class="wrap">
 <nav><a class="logo" href="/"><span class="ball"></span>${NAME}</a>
-<div class="who">${esc(user.login)} 님 <form class="inline" method="post" action="/logout"><button class="btn btn-ghost btn-sm">로그아웃</button></form></div></nav>
+<div class="who"><a class="nav-noti" href="/notices">🔔 알림<span class="nbadge" id="noti-n" hidden></span></a><span class="uname">${esc(user.login)} 님</span> <form class="inline" method="post" action="/logout"><button class="btn btn-ghost btn-sm">로그아웃</button></form></div></nav>
 ${flash ? `<div class="flash${flashErr ? ' err' : ''}">${esc(flash)}</div>` : ''}
 <div class="hero"><div><h1>다음 자동 예약까지</h1><p>대기 중인 예약 ${pending.length}건 · 매일 00:01 실행</p></div><div class="cd" id="cd"></div></div>
 
@@ -451,8 +487,9 @@ ${user.default_shop ? `<div class="card"><h2>🔎 빈 시간 미리 보기</h2>
 ${slotsView ? (slotsView.error ? `<p class="desc bad" style="margin-top:12px">${esc(slotsView.error)}</p>` : slotsView.times.length ? `<div class="chips">${slotsView.times.map((s) => `<span class="${s.open ? 'open' : 'shut'}">${esc(s.t)} <small>${esc(s.state)}</small></span>`).join('')}</div>${slotsView.times.every((s) => !s.open) ? '<p class="desc" style="margin-top:10px">«잠금»은 아직 예약이 열리기 전이라는 뜻이에요. 자정에 열리면 자동으로 시도합니다.</p>' : ''}` : `<p class="desc" style="margin-top:12px">${esc(slotsView.date)} 빈 시간이 보이지 않습니다 (아직 안 열렸거나 모두 찼어요).</p>`) : ''}
 </div>` : ''}
 
-<div class="card"><h2>🔔 알림 받을 곳</h2>
-<p class="desc">경매알리미와 같은 방식이에요. 둘 다 연결하면 둘 다로 보냅니다.</p>
+<div class="card" id="noti-card"><h2>🔔 알림 받을 곳</h2>
+<p class="desc">아래 셋 중 편한 것을 켜 두세요. 여러 개를 켜면 모두로 보냅니다. 보낸 알림은 위쪽 <a href="/notices">«알림»</a>에도 모아 둡니다.</p>
+<div class="pushwrap" id="push-box"></div>
 <label>카카오톡 (나와의 채팅으로 받기)</label>
 ${user.kakao_refresh ? `<p class="desc"><span class="ok">● 연결됨</span>${user.kakao_at ? ` · ${esc(user.kakao_at.slice(0, 16))}` : ''}</p>
 <div class="actions"><form class="inline" method="post" action="/app/notify/test"><button class="btn btn-ghost btn-sm">시험 알림 보내기</button></form>
@@ -468,7 +505,7 @@ ${user.kakao_refresh ? `<p class="desc"><span class="ok">● 연결됨</span>${u
 <div><label>새 비밀번호 (4자 이상)</label><input type="password" name="new" required minlength="4" autocomplete="new-password"></div></div>
 <div class="actions"><button class="btn btn-ghost btn-sm">바꾸기</button></div></form></div>
 </div>`;
-  return shell(`내 예약 · ${NAME}`, body, { css: APP_CSS, script: APP_JS });
+  return shell(`내 예약 · ${NAME}`, body + '<script src="/push-client.js"></script>', { css: APP_CSS + PUSH_CSS, script: APP_JS + PUSH_JS });
 }
 
 // 앞으로의 예약이고, 사이트가 «완료/종료»로 표시하지 않았으면 취소 가능
@@ -495,4 +532,4 @@ function mineFragment(list, nowKst, error) {
     + (past.length ? `<details><summary>지난 예약 ${past.length}건</summary>${past.map((r) => row(r, false)).join('')}</details>` : '');
 }
 
-module.exports = { landing, loginPage, messagePage, appPage, mineFragment, isCancellable, esc, NAME, ICON_SVG };
+module.exports = { landing, loginPage, messagePage, appPage, noticesPage, mineFragment, isCancellable, esc, NAME, ICON_SVG };

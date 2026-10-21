@@ -25,6 +25,7 @@ if (cmd === 'users') {
   if (!u) { console.log('없는 아이디'); process.exit(1); }
   for (const t of ['requests', 'sessions', 'logs']) run(`DELETE FROM ${t} WHERE user_id=?`, u.id);
   run('DELETE FROM users WHERE id=?', u.id);
+  require('../src/push')().forget(String(u.id)); // 기기 알림 주소·알림함도 지운다 (번호가 다시 쓰일 수 있어서)
   console.log(`${arg} 삭제`);
 } else {
   console.log('사용: users | reset <아이디> | requests | logs [n] | delete <아이디>');
