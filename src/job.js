@@ -1,6 +1,7 @@
 // 자정 예약 작업. systemd 타이머가 23:58:30 에 띄운다 (deploy/golf-midnight.timer).
 //   23:58:30 대기 중인 예약을 모아 사람별로 임팩트비전에 미리 로그인
-//   00:01:00 — 모두 동시에 예약 시도 (START_DELAY_SEC, 정각 직후 혼잡 피함). 거절되면 FULL_RETRIES 번 더. 시간표가 아직 안 열렸으면 OPEN_WAIT_SEC 동안 2초마다 다시 본다
+//   00:00:00 — 우선 회원(PRIORITY_LOGINS, 운영자)이 먼저 시도 (PRIORITY_DELAY_SEC, 2026-10-29 사용자 요청)
+//   00:01:00 — 나머지 회원이 동시에 예약 시도 (START_DELAY_SEC, 정각 직후 혼잡 피함). 거절되면 FULL_RETRIES 번 더. 시간표가 아직 안 열렸으면 OPEN_WAIT_SEC 동안 2초마다 다시 본다
 //   끝나면 운영자 디스코드에 요약
 // 손으로 돌리기: node src/job.js --now   (기다리지 않고 바로, 오늘 날짜 기준)
 const { all, run, now, log } = require('./db');
@@ -11,6 +12,9 @@ const notify = require('./notify');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const nextDay = (d) => new Date(Date.parse(d + 'T00:00:00Z') + 86400e3).toISOString().slice(0, 10);
 const START_DELAY_SEC = Number(process.env.START_DELAY_SEC || 60);
+// 우선 회원: 이 사이트 아이디(쉼표로 여러 개). 운영자만 00:00 정각, 다른 회원은 00:01 (2026-10-29 사용자 요청)
+const PRIORITY_LOGINS = String(process.env.PRIORITY_LOGINS || '').split(',').map((x) => x.trim()).filter(Boolean);
+const PRIORITY_DELAY_SEC = Number(process.env.PRIORITY_DELAY_SEC || 0);
 const FULL_RETRIES = Number(process.env.FULL_RETRIES || 2);
 const NOW_MODE = process.argv.includes('--now');
 
@@ -18,7 +22,9 @@ async function main() {
   const kstHour = new Date(Date.now() + 9 * 3600e3).getUTCHours();
   // 저녁에 시작했으면 내일이 «오늘», 자정 넘어 시작했으면(지연) 오늘
   const openDay = NOW_MODE || kstHour < 12 ? kstToday(0) : kstToday(1);
-  const midnight = Date.parse(`${openDay}T00:00:00+09:00`) + START_DELAY_SEC * 1000; // 사용자 요청(10-21): 정각 말고 00:01
+  const zero = Date.parse(`${openDay}T00:00:00+09:00`);
+  // 사람마다 시작 시각 — 우선 회원은 00:00, 나머지는 00:01 (사용자 요청 10-21 «정각 말고 00:01», 10-29 «나만 00:00»)
+  const startOf = (user) => zero + (PRIORITY_LOGINS.includes(user.login) ? PRIORITY_DELAY_SEC : START_DELAY_SEC) * 1000;
 
   // 지난 날짜는 닫는다
   for (const r of all("SELECT * FROM requests WHERE status='대기' AND target_date < ?", openDay)) {
@@ -43,15 +49,15 @@ async function main() {
     } catch (e) { loginFails.push(`${user.login}: ${e.message}`); }
   }));
 
-  // 2) 정각까지 기다림
-  if (!NOW_MODE) {
-    const wait = midnight - Date.now();
-    if (wait > 0) { console.log(`정각까지 ${(wait / 1000).toFixed(1)}초 대기`); await sleep(wait); }
-  }
-
   // 3) 사람별 동시에, 한 사람 안에서는 날짜 순서대로
   const results = [];
   await Promise.all([...sessions].map(async ([uid, session]) => {
+    // 2) 그 사람의 시작 시각까지 기다림
+    if (!NOW_MODE) {
+      const who = all('SELECT login FROM users WHERE id=?', uid)[0];
+      const wait = startOf(who) - Date.now();
+      if (wait > 0) { console.log(`#${uid} 시작까지 ${(wait / 1000).toFixed(1)}초 대기`); await sleep(wait); }
+    }
     for (const req of byUser.get(uid)) {
       const final = req.target_date === openDay;
       // 막 열릴 날짜(오늘·내일)만 몇 초마다 다시 본다. 더 먼 날짜는 한 번 보고 다음 밤으로
